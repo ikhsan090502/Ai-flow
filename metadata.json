@@ -1,0 +1,6 @@
+{
+  "name": "FuturesMax AI Flow",
+  "description": "AI-powered crypto and forex technical analysis tool providing real-time entry signals, automatic Telegram notifications, and historical performance tracking.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
