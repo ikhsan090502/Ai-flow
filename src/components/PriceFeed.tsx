@@ -11,7 +11,7 @@ interface PriceFeedProps {
 export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
   const [prices, setPrices] = useState<Record<string, LivePrice>>({});
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<'all' | 'crypto' | 'forex' | 'commodity'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'crypto' | 'forex' | 'commodity' | 'stock'>('all');
   const [isLoading, setIsLoading] = useState(true);
 
   // Initial fetch and set interval loop
@@ -92,7 +92,7 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
 
       {/* Categories Selector */}
       <div className="flex space-x-1 p-1 bg-slate-950 rounded-lg mb-4">
-        {(['all', 'commodity', 'crypto', 'forex'] as const).map((cat) => (
+        {(['all', 'commodity', 'crypto', 'forex', 'stock'] as const).map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
@@ -100,7 +100,7 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
               activeCategory === cat ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-350'
             }`}
           >
-            {cat === 'all' ? 'Semua' : cat === 'commodity' ? 'Metal' : cat}
+            {cat === 'all' ? 'Semua' : cat === 'commodity' ? 'Metal' : cat === 'stock' ? 'Saham' : cat}
           </button>
         ))}
       </div>
@@ -134,7 +134,7 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
                       {asset.symbol}
                     </span>
                     <span className="text-[9px] px-1 bg-slate-900 rounded text-slate-500 font-mono">
-                      {asset.type === 'crypto' ? 'COIN' : asset.type === 'commodity' ? 'METAL' : 'FX'}
+                      {asset.type === 'crypto' ? 'COIN' : asset.type === 'commodity' ? 'METAL' : asset.type === 'stock' ? 'SAHAM' : 'FX'}
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono uppercase truncate max-w-[130px]">
@@ -144,7 +144,11 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
 
                 <div className="text-right flex flex-col items-end">
                   <div className="text-sm font-mono font-bold text-white tracking-tight">
-                    {asset.type === 'forex' ? p.price.toFixed(5) : p.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    {asset.type === 'forex' 
+                      ? p.price.toFixed(5) 
+                      : asset.type === 'stock'
+                        ? 'Rp' + p.price.toLocaleString('id-ID', { minimumFractionDigits: 0, maximumFractionDigits: 0 })
+                        : p.price.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                   </div>
                   
                   <div className="flex items-center space-x-1.5 mt-0.5">

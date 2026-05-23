@@ -209,8 +209,11 @@ app.post('/api/analyze', async (req, res) => {
   }
 
   // Build high impact prompt
-  const systemPrompt = `Kamu adalah FuturesMax AI, sebuah sistem AI analis profesional elit di pasar Crypto dan Forex.
+  const systemPrompt = `Kamu adalah FuturesMax AI, sebuah sistem AI analis profesional elit di pasar Crypto, Forex, Komoditas, dan Saham Indonesia (IDX).
 Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan parameter input dan memberikan rekomendasi serta sinyal perdagangan (Signal Entry) yang akurat dan kredibel.
+
+Jika aset adalah Saham Indonesia (misal: BBCA, BBRI, TLKM, GOTO, BMRI, ASII), analisislah dengan dinamika khas pasar saham domestik Indonesia (IHSG / BEI) dan pastikan memberikan harga entryPrice, takeProfit1, takeProfit2, dan stopLoss dalam bentuk angka bulat Rupiah (integer tanpa decimal sepeser pun).
+Jika indikator opsional mengandung 'Momentum Pembalikan', fokuskan analisis pada penemuan pola-pola pembalikan tren (reversal momentum) seperti bullish/bearish divergence, overbought/oversold exhaustion, double bottom/top, head and shoulders, atau harmonic patterns, serta konfirmasi kegagalan breakout (liquidity sweep).
 
 REKAYASA SINYAL:
 - Tentukan jenis aksi trading: 'BUY', 'SELL', atau 'NEUTRAL'.
@@ -270,7 +273,8 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
 
     // Inject unique server ID and generate a running record from the dynamic signal
     const isCrypto = pair.toUpperCase().includes('USDT');
-    const multiplier = isCrypto ? 100 : (pair.toUpperCase().includes('JPY') ? 100 : 10000);
+    const isStock = ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO', 'BMRI'].some(s => pair.toUpperCase().startsWith(s));
+    const multiplier = isStock ? 1 : (isCrypto ? 100 : (pair.toUpperCase().includes('JPY') ? 100 : 10000));
     
     // Default initial profit/pips calculated on the analysis result vs initial value (Neutral starts at 0)
     let initialPips = 0;

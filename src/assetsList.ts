@@ -20,4 +20,12 @@ export const SUPPORTED_ASSETS: Asset[] = [
   { symbol: 'USDJPY', name: 'US Dollar / Japanese Yen', type: 'forex', baseAsset: 'USD', quoteAsset: 'JPY' },
   { symbol: 'USDCAD', name: 'US Dollar / Canadian Dollar', type: 'forex', baseAsset: 'USD', quoteAsset: 'CAD' },
   { symbol: 'USDCHF', name: 'US Dollar / Swiss Franc', type: 'forex', baseAsset: 'USD', quoteAsset: 'CHF' },
+
+  // Saham Indonesia (IDX)
+  { symbol: 'BBCA', name: 'Bank Central Asia Tbk', type: 'stock', baseAsset: 'BBCA', quoteAsset: 'IDR' },
+  { symbol: 'BBRI', name: 'Bank Rakyat Indonesia Tbk', type: 'stock', baseAsset: 'BBRI', quoteAsset: 'IDR' },
+  { symbol: 'TLKM', name: 'Telkom Indonesia Tbk', type: 'stock', baseAsset: 'TLKM', quoteAsset: 'IDR' },
+  { symbol: 'ASII', name: 'Astra International Tbk', type: 'stock', baseAsset: 'ASII', quoteAsset: 'IDR' },
+  { symbol: 'GOTO', name: 'GoTo Gojek Tokopedia Tbk', type: 'stock', baseAsset: 'GOTO', quoteAsset: 'IDR' },
+  { symbol: 'BMRI', name: 'Bank Mandiri Tbk', type: 'stock', baseAsset: 'BMRI', quoteAsset: 'IDR' },
 ];

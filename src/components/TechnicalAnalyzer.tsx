@@ -128,7 +128,8 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
 
   const availableIndicators = [
     'EMA-50', 'EMA-200', 'RSI', 'MACD', 'Orderblock / SMC', 
-    'Support / Resistance', 'Bollinger Bands', 'Volume Profile'
+    'Support / Resistance', 'Bollinger Bands', 'Volume Profile',
+    'Momentum Pembalikan'
   ];
 
   return (
@@ -321,28 +322,40 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
             </div>
 
             {/* Entry target boxes */}
-            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">ENTRY PRICE</p>
-                <div className="text-lg font-mono font-bold text-white mt-1.5 tracking-tight">{activeSignal.entryPrice}</div>
-              </div>
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-emerald-400 font-mono uppercase tracking-wider flex items-center justify-center">
-                  <CheckSquare size={10} className="mr-1" /> TARGET PROFIT 1
-                </p>
-                <div className="text-lg font-mono font-bold text-emerald-400 mt-1.5 tracking-tight">{activeSignal.takeProfit1}</div>
-              </div>
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-emerald-400 font-mono uppercase tracking-wider flex items-center justify-center">
-                  <CheckSquare size={10} className="mr-1" /> TARGET PROFIT 2
-                </p>
-                <div className="text-lg font-mono font-bold text-emerald-400 mt-1.5 tracking-tight">{activeSignal.takeProfit2}</div>
-              </div>
-              <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
-                <p className="text-[10px] text-rose-455 text-rose-400 font-mono uppercase tracking-wider">STOP LOSS</p>
-                <div className="text-lg font-mono font-bold text-rose-455 text-rose-400 mt-1.5 tracking-tight">{activeSignal.stopLoss}</div>
-              </div>
-            </div>
+            {(() => {
+              const isIdxStock = ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO', 'BMRI'].some(s => activeSignal.pair.toUpperCase().startsWith(s));
+              const formatPriceVal = (val: number) => {
+                if (isIdxStock) {
+                  return 'Rp' + val.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+                }
+                return val;
+              };
+
+              return (
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mt-6">
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
+                    <p className="text-[10px] text-slate-400 font-mono uppercase tracking-wider">ENTRY PRICE</p>
+                    <div className="text-lg font-mono font-bold text-white mt-1.5 tracking-tight">{formatPriceVal(activeSignal.entryPrice)}</div>
+                  </div>
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
+                    <p className="text-[10px] text-emerald-400 font-mono uppercase tracking-wider flex items-center justify-center">
+                      <CheckSquare size={10} className="mr-1" /> TARGET PROFIT 1
+                    </p>
+                    <div className="text-lg font-mono font-bold text-emerald-400 mt-1.5 tracking-tight">{formatPriceVal(activeSignal.takeProfit1)}</div>
+                  </div>
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
+                    <p className="text-[10px] text-emerald-400 font-mono uppercase tracking-wider flex items-center justify-center">
+                      <CheckSquare size={10} className="mr-1" /> TARGET PROFIT 2
+                    </p>
+                    <div className="text-lg font-mono font-bold text-emerald-400 mt-1.5 tracking-tight">{formatPriceVal(activeSignal.takeProfit2)}</div>
+                  </div>
+                  <div className="bg-slate-950/80 border border-slate-800 rounded-xl p-4 text-center">
+                    <p className="text-[10px] text-rose-455 text-rose-400 font-mono uppercase tracking-wider">STOP LOSS</p>
+                    <div className="text-lg font-mono font-bold text-rose-455 text-rose-400 mt-1.5 tracking-tight">{formatPriceVal(activeSignal.stopLoss)}</div>
+                  </div>
+                </div>
+              );
+            })()}
 
             {/* Analysis Rows (Indonesian) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">

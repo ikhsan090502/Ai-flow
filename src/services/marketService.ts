@@ -17,6 +17,14 @@ const FIXED_SEEDS: Record<string, { price: number; change24h: number }> = {
   BNBUSDT: { price: 615.30, change24h: -0.30 },
   DOGEUSDT: { price: 0.1850, change24h: 12.40 },
   XRPUSDT: { price: 1.2540, change24h: -1.20 },
+  
+  // Indonesian Stocks
+  BBCA: { price: 9850, change24h: 0.51 },
+  BBRI: { price: 4720, change24h: -1.25 },
+  TLKM: { price: 3050, change24h: 1.15 },
+  ASII: { price: 4950, change24h: -0.80 },
+  GOTO: { price: 6200, change24h: 3.33 },
+  BMRI: { price: 6150, change24h: -0.40 },
 };
 
 // Local storage state for tracking runtime simulated prices
@@ -89,7 +97,7 @@ export async function getLivePrices(): Promise<Record<string, LivePrice>> {
       const nextPrice = priceObject.price * (1 + changePercent);
       currentPrices[asset.symbol] = {
         ...priceObject,
-        price: Number(nextPrice.toFixed(asset.type === 'forex' ? 5 : 2)),
+        price: Number(nextPrice.toFixed(asset.type === 'stock' ? 0 : asset.type === 'forex' ? 5 : 2)),
         lastUpdated: Date.now(),
       };
     }
@@ -112,7 +120,7 @@ export function tickLivePrices(): Record<string, LivePrice> {
       
       currentPrices[asset.symbol] = {
         ...p,
-        price: Number(nextPrice.toFixed(asset.type === 'forex' ? 5 : 2)),
+        price: Number(nextPrice.toFixed(asset.type === 'stock' ? 0 : asset.type === 'forex' ? 5 : 2)),
         lastUpdated: Date.now(),
       };
     }

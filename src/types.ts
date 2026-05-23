@@ -1,4 +1,4 @@
-export type AssetType = 'crypto' | 'forex' | 'commodity';
+export type AssetType = 'crypto' | 'forex' | 'commodity' | 'stock';
 
 export interface Asset {
   symbol: string;      // exchange symbol (e.g., BTCUSDT, EURUSD=X)

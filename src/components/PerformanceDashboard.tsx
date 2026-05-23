@@ -261,7 +261,7 @@ export default function PerformanceDashboard({ signals, onResetHistory, isLoadin
                 <th className="py-3 px-4 font-normal">ENTRY</th>
                 <th className="py-3 px-4 font-normal">CURRENT</th>
                 <th className="py-3 px-4 font-normal">STATUS</th>
-                <th className="py-3 px-4 font-normal text-right">RETURN PIPS</th>
+                <th className="py-3 px-4 font-normal text-right">RETURN (PIPS/PTS)</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-800/40 text-xs font-mono">
@@ -269,6 +269,14 @@ export default function PerformanceDashboard({ signals, onResetHistory, isLoadin
                 const dt = new Date(sig.timestamp).toLocaleDateString([], { month: 'short', day: '2-digit' }) + 
                            ' - ' + new Date(sig.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
                 const isPos = sig.pipsProfit >= 0;
+                const isIdxStock = ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO', 'BMRI'].some(s => sig.pair.toUpperCase().startsWith(s));
+
+                const formatPrice = (val: number) => {
+                  if (isIdxStock) {
+                    return 'Rp' + val.toLocaleString('id-ID', { maximumFractionDigits: 0 });
+                  }
+                  return val;
+                };
 
                 return (
                   <tr key={sig.id} className="hover:bg-slate-950/40 transition">
@@ -282,8 +290,8 @@ export default function PerformanceDashboard({ signals, onResetHistory, isLoadin
                       </span>
                     </td>
                     <td className="py-3.5 px-4 text-slate-400">{sig.style}</td>
-                    <td className="py-3.5 px-4 text-slate-300">{sig.entryPrice}</td>
-                    <td className="py-3.5 px-4 text-slate-300">{sig.currentPrice}</td>
+                    <td className="py-3.5 px-4 text-slate-300">{formatPrice(sig.entryPrice)}</td>
+                    <td className="py-3.5 px-4 text-slate-300">{formatPrice(sig.currentPrice)}</td>
                     <td className="py-3.5 px-4">
                       <span className={`px-2 py-0.5 rounded text-[9px] font-semibold uppercase ${
                         sig.status === 'TAKE_PROFIT' ? 'bg-emerald-500 text-slate-950 font-bold' : (sig.status === 'STOP_LOSS' ? 'bg-rose-500 text-white font-bold' : 'bg-slate-800 text-slate-300')
@@ -292,7 +300,9 @@ export default function PerformanceDashboard({ signals, onResetHistory, isLoadin
                       </span>
                     </td>
                     <td className={`py-3.5 px-4 text-right font-bold ${isPos ? 'text-emerald-400' : 'text-rose-455 text-rose-400'}`}>
-                      {sig.status === 'ACTIVE' ? '-' : (isPos ? '+' : '') + sig.pipsProfit}
+                      {sig.status === 'ACTIVE' 
+                        ? '-' 
+                        : (isPos ? '+' : '') + sig.pipsProfit + (isIdxStock ? ' pts' : '')}
                     </td>
                   </tr>
                 );

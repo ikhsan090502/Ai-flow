@@ -1,6 +1,81 @@
 <!doctype html>
 <html lang="en">
   <head>
+    <script>
+      // Fixes "Cannot set property fetch of #<Window> which has only a getter" in secure sandboxed preview environments
+      (function() {
+        try {
+          const originalGlobalThis = window.globalThis || window;
+          const originalFetch = window.fetch;
+          
+          let proxy;
+          const proxyHandler = {
+            get(target, prop) {
+              if (prop === 'fetch') {
+                return originalFetch;
+              }
+              if (prop === 'globalThis' || prop === 'global' || prop === 'self' || prop === 'window') {
+                return proxy;
+              }
+              const val = target[prop];
+              if (typeof val === 'function') {
+                // Binding native methods to the original target avoids "Illegal invocation" errors
+                return val.bind(target);
+              }
+              return val;
+            },
+            set(target, prop, value) {
+              if (prop === 'fetch') {
+                // Silently bypass writable constraints on protected attributes
+                return true;
+              }
+              target[prop] = value;
+              return true;
+            },
+            has(target, prop) {
+              return prop in target;
+            },
+            getOwnPropertyDescriptor(target, prop) {
+              if (prop === 'fetch') {
+                return {
+                  value: originalFetch,
+                  writable: true,
+                  configurable: true,
+                  enumerable: true
+                };
+              }
+              return Reflect.getOwnPropertyDescriptor(target, prop);
+            }
+          };
+
+          proxy = new Proxy(originalGlobalThis, proxyHandler);
+
+          // Expose proxy to handle global scopes transparently
+          Object.defineProperty(window, 'globalThis', {
+            value: proxy,
+            configurable: true,
+            writable: true,
+            enumerable: true
+          });
+
+          Object.defineProperty(window, 'global', {
+            value: proxy,
+            configurable: true,
+            writable: true,
+            enumerable: true
+          });
+
+          Object.defineProperty(window, 'self', {
+            value: proxy,
+            configurable: true,
+            writable: true,
+            enumerable: true
+          });
+        } catch (e) {
+          console.warn('Failed to intercept readonly fetch properties safely:', e);
+        }
+      })();
+    </script>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Google AI Studio App</title>
