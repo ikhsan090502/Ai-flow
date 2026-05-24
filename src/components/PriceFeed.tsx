@@ -11,7 +11,7 @@ interface PriceFeedProps {
 export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
   const [prices, setPrices] = useState<Record<string, LivePrice>>({});
   const [search, setSearch] = useState('');
-  const [activeCategory, setActiveCategory] = useState<'all' | 'crypto' | 'forex' | 'commodity' | 'stock'>('all');
+  const [activeCategory, setActiveCategory] = useState<'all' | 'crypto' | 'crypto_futures' | 'forex' | 'commodity' | 'stock'>('all');
   const [isLoading, setIsLoading] = useState(true);
 
   // Initial fetch and set interval loop
@@ -91,16 +91,26 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
       </div>
 
       {/* Categories Selector */}
-      <div className="flex space-x-1 p-1 bg-slate-950 rounded-lg mb-4">
-        {(['all', 'commodity', 'crypto', 'forex', 'stock'] as const).map((cat) => (
+      <div className="flex flex-wrap gap-1 p-1 bg-slate-950 rounded-lg mb-4">
+        {(['all', 'commodity', 'crypto', 'crypto_futures', 'forex', 'stock'] as const).map((cat) => (
           <button
             key={cat}
             onClick={() => setActiveCategory(cat)}
-            className={`flex-1 text-[10px] sm:text-xs py-1.5 rounded-md font-mono font-medium uppercase transition ${
+            className={`px-2 py-1.5 rounded-md font-mono text-[9px] sm:text-[10px] font-medium uppercase transition ${
               activeCategory === cat ? 'bg-slate-800 text-white shadow-sm' : 'text-slate-500 hover:text-slate-350'
             }`}
           >
-            {cat === 'all' ? 'Semua' : cat === 'commodity' ? 'Metal' : cat === 'stock' ? 'Saham' : cat}
+            {cat === 'all' 
+              ? 'Semua' 
+              : cat === 'commodity' 
+                ? 'Metal' 
+                : cat === 'crypto'
+                  ? 'Spot'
+                  : cat === 'crypto_futures'
+                    ? 'Futures'
+                    : cat === 'stock' 
+                      ? 'Saham' 
+                      : cat}
           </button>
         ))}
       </div>
@@ -134,7 +144,15 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
                       {asset.symbol}
                     </span>
                     <span className="text-[9px] px-1 bg-slate-900 rounded text-slate-500 font-mono">
-                      {asset.type === 'crypto' ? 'COIN' : asset.type === 'commodity' ? 'METAL' : asset.type === 'stock' ? 'SAHAM' : 'FX'}
+                      {asset.type === 'crypto' 
+                        ? 'SPOT' 
+                        : asset.type === 'crypto_futures' 
+                          ? 'FUTURES' 
+                          : asset.type === 'commodity' 
+                            ? 'METAL' 
+                            : asset.type === 'stock' 
+                              ? 'SAHAM' 
+                              : 'FX'}
                     </span>
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono uppercase truncate max-w-[130px]">

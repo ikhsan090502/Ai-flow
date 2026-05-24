@@ -4,14 +4,17 @@ import PriceFeed from './components/PriceFeed';
 import TechnicalAnalyzer from './components/TechnicalAnalyzer';
 import PerformanceDashboard from './components/PerformanceDashboard';
 import TelegramPanel from './components/TelegramPanel';
-import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw } from 'lucide-react';
+import NewsSentimentHub from './components/NewsSentimentHub';
+import BrokerRecommendations from './components/BrokerRecommendations';
+import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'analyzer' | 'dashboard' | 'telegram'>('analyzer');
+  const [activeTab, setActiveTab] = useState<'analyzer' | 'dashboard' | 'telegram' | 'broker'>('analyzer');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
   const [signals, setSignals] = useState<MarketSignal[]>([]);
   const [isLoading, setIsLoading] = useState(false);
+  const [injectedNewsContext, setInjectedNewsContext] = useState<string | undefined>(undefined);
 
   // Read telegram credentials dynamically from localStorage
   const [telegramConfig, setTelegramConfig] = useState<TelegramConfig>(() => {
@@ -83,6 +86,15 @@ export default function App() {
     setActiveTab('analyzer'); // focus tab to let them analyze instantly
   };
 
+  const handleInjectNewsContext = (context: string) => {
+    setInjectedNewsContext(context);
+    setActiveTab('analyzer');
+  };
+
+  const handlePriceImpactApplied = () => {
+    // Simply allow updates or trigger alerts where needed
+  };
+
   return (
     <div className="min-h-screen bg-slate-950 text-slate-100 flex flex-col selection:bg-emerald-500 selection:text-slate-950">
       {/* Visual Status Utility Bar */}
@@ -115,10 +127,10 @@ export default function App() {
         </div>
 
         {/* Global tab selectors */}
-        <div className="flex bg-slate-950 border border-slate-800 rounded-xl p-1 w-full md:w-auto">
+        <div className="flex flex-wrap bg-slate-950 border border-slate-800 rounded-xl p-1 w-full md:w-auto gap-1">
           <button
             onClick={() => setActiveTab('analyzer')}
-            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
               activeTab === 'analyzer' 
                 ? 'bg-slate-800 text-white shadow-sm' 
                 : 'text-slate-400 hover:text-white'
@@ -130,7 +142,7 @@ export default function App() {
           
           <button
             onClick={() => setActiveTab('dashboard')}
-            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
               activeTab === 'dashboard' 
                 ? 'bg-slate-800 text-white shadow-sm' 
                 : 'text-slate-400 hover:text-white'
@@ -141,8 +153,20 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setActiveTab('broker')}
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+              activeTab === 'broker' 
+                ? 'bg-slate-800 text-white shadow-sm' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Coins size={14} />
+            <span>Bursa & Broker</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('telegram')}
-            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-4 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
               activeTab === 'telegram' 
                 ? 'bg-slate-800 text-white shadow-sm' 
                 : 'text-slate-400 hover:text-white'
@@ -156,9 +180,13 @@ export default function App() {
 
       {/* Main Dashboard Layout section */}
       <main className="flex-1 max-w-7xl w-full mx-auto px-6 py-6 grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-        {/* Left column: Live Feed (Grid 4 col) */}
-        <section className="lg:col-span-4 h-full">
+        {/* Left column: Live Feed and Shocks Hub (Grid 4 col) */}
+        <section className="lg:col-span-4 space-y-6">
           <PriceFeed onSelectAsset={handleSelectAsset} />
+          <NewsSentimentHub
+            onInjectNewsContext={handleInjectNewsContext}
+            onPriceImpactApplied={handlePriceImpactApplied}
+          />
         </section>
 
         {/* Right column: Main Workspace (Grid 8 col) */}
@@ -169,6 +197,7 @@ export default function App() {
               selectedPrice={selectedPrice}
               telegramConfig={telegramConfig}
               onSignalGenerated={handleNewSignalCreated}
+              injectedNews={injectedNewsContext}
             />
           )}
 
@@ -178,6 +207,10 @@ export default function App() {
               onResetHistory={handleResetHistory}
               isLoading={isLoading}
             />
+          )}
+
+          {activeTab === 'broker' && (
+            <BrokerRecommendations />
           )}
 
           {activeTab === 'telegram' && (

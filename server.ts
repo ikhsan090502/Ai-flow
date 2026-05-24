@@ -14,6 +14,11 @@ const PORT = 3000;
 // Middleware
 app.use(express.json());
 
+// Health check route for uptime monitoring (e.g. UptimeRobot, Cron-Job.org)
+app.get('/api/health', (req, res) => {
+  res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
 // Initialize Gemini Client
 const geminiApiKey = process.env.GEMINI_API_KEY || '';
 let ai: GoogleGenAI | null = null;

@@ -11,9 +11,10 @@ interface TechnicalAnalyzerProps {
   selectedPrice: number | null;
   telegramConfig: TelegramConfig;
   onSignalGenerated: (newSignal: MarketSignal) => void;
+  injectedNews?: string;
 }
 
-export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegramConfig, onSignalGenerated }: TechnicalAnalyzerProps) {
+export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegramConfig, onSignalGenerated, injectedNews }: TechnicalAnalyzerProps) {
   const [pair, setPair] = useState('');
   const [currentPrice, setCurrentPrice] = useState('');
   const [timeframe, setTimeframe] = useState('M15');
@@ -26,6 +27,20 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
   
   const [autoTelegram, setAutoTelegram] = useState(true);
   const [telegramStatus, setTelegramStatus] = useState<'idle' | 'sending' | 'success' | 'failed'>('idle');
+
+  // Futures perpetual specific states
+  const [leverage, setLeverage] = useState(20);
+  const [isLong, setIsLong] = useState(true);
+
+  // Sync injectedNews changes
+  useEffect(() => {
+    if (injectedNews) {
+      setCustomPrompt((prev) => {
+        if (prev.includes(injectedNews)) return prev;
+        return injectedNews + "\n\n" + prev;
+      });
+    }
+  }, [injectedNews]);
 
   // Sync selected asset changes from PriceFeed
   useEffect(() => {
@@ -207,6 +222,93 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               })}
             </div>
           </div>
+
+          {/* Conditional Futures Calculator Desk */}
+          {pair.toUpperCase().includes('_PERP') && (
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800 space-y-3.5" id="futures-simulator-panel">
+              <div className="flex justify-between items-center text-xs font-mono">
+                <span className="text-amber-400 font-bold flex items-center space-x-1.5 uppercase">
+                  <span className="w-2 h-2 rounded-full bg-amber-400 inline-block animate-pulse" />
+                  <span>Kalkulator Kontrak Berjangka (Futures)</span>
+                </span>
+                <span className="text-slate-500 font-semibold">TIPE: PERPETUAL SWAP</span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs font-mono">
+                {/* Long vs Short Toggle */}
+                <div>
+                  <p className="text-slate-400 mb-1.5 block">Arah Posisi</p>
+                  <div className="flex bg-slate-900 p-1 border border-slate-800 rounded-lg">
+                    <button
+                      type="button"
+                      onClick={() => setIsLong(true)}
+                      className={`flex-1 text-center py-1.5 rounded-md font-bold transition uppercase ${
+                        isLong ? 'bg-emerald-950/70 border border-emerald-800 text-emerald-400' : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      Beli / Long (🟢)
+                    </button>
+                    <button
+                      type="button"
+                      onClick={() => setIsLong(false)}
+                      className={`flex-1 text-center py-1.5 rounded-md font-bold transition uppercase ${
+                        !isLong ? 'bg-rose-955/70 border border-rose-800 text-rose-400' : 'text-slate-500 hover:text-slate-300'
+                      }`}
+                    >
+                      Jual / Short (🔴)
+                    </button>
+                  </div>
+                </div>
+
+                {/* Leverage Slider */}
+                <div>
+                  <p className="text-slate-400 mb-1.5 flex justify-between">
+                    <span>Leverage Kaliber</span>
+                    <span className="font-bold text-amber-400">{leverage}x</span>
+                  </p>
+                  <div className="flex items-center space-x-2">
+                    <input
+                      type="range"
+                      min="1"
+                      max="125"
+                      value={leverage}
+                      onChange={(e) => setLeverage(parseInt(e.target.value) || 20)}
+                      className="w-full h-1.5 bg-slate-900 rounded-lg appearance-none cursor-pointer accent-emerald-500"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Advanced info panel / liquidator preview */}
+              <div className="bg-slate-900/60 p-3 rounded-lg border border-slate-900 grid grid-cols-2 sm:grid-cols-3 gap-3 text-[10px] sm:text-xs font-mono">
+                <div>
+                  <span className="text-slate-500 block">Biaya Pendanaan (Est):</span>
+                  <span className="text-slate-200 block font-bold mt-0.5">+0.0125% <span className="text-[9px] text-slate-500">/ 8j</span></span>
+                </div>
+                <div>
+                  <span className="text-slate-500 block">Margin Minimum (Est):</span>
+                  <span className="text-slate-200 block font-bold mt-0.5">
+                    {parseFloat(currentPrice) > 0 
+                      ? (parseFloat(currentPrice) / leverage).toLocaleString(undefined, { maximumFractionDigits: 2 })
+                      : '0.00'}{' '}
+                    USDT
+                  </span>
+                </div>
+                <div className="col-span-2 sm:col-span-1 border-t sm:border-t-0 sm:border-l border-slate-800 pt-2 sm:pt-0 sm:pl-3 flex flex-col justify-center">
+                  <span className="text-rose-400 font-bold block">Harga Likuidasi (Est):</span>
+                  <span className="text-sm text-rose-400 block font-extrabold mt-0.5">
+                    {parseFloat(currentPrice) > 0 
+                      ? (isLong 
+                          ? parseFloat(currentPrice) * (1 - 0.9 / leverage) 
+                          : parseFloat(currentPrice) * (1 + 0.9 / leverage)
+                        ).toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+                      : '0.00'}{' '}
+                    USDT
+                  </span>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Custom Market Context */}
           <div>
