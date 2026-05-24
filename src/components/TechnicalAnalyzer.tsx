@@ -18,6 +18,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
   const [pair, setPair] = useState('');
   const [currentPrice, setCurrentPrice] = useState('');
   const [timeframe, setTimeframe] = useState('M15');
+  const [tradingStyle, setTradingStyle] = useState<'SCALP' | 'DAY TRADE' | 'SWING' | 'POSITION'>('SCALP');
   const [customPrompt, setCustomPrompt] = useState('');
   const [indicators, setIndicators] = useState<string[]>(['EMA-50', 'Orderblock / SMC', 'RSI']);
   
@@ -27,6 +28,21 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
   
   const [autoTelegram, setAutoTelegram] = useState(true);
   const [telegramStatus, setTelegramStatus] = useState<'idle' | 'sending' | 'success' | 'failed'>('idle');
+
+  // Local continuous learning history base
+  const [historyLogs, setHistoryLogs] = useState<MarketSignal[]>([]);
+
+  // Load history from localStorage on startup
+  useEffect(() => {
+    const saved = localStorage.getItem('futuresmax_analysis_history');
+    if (saved) {
+      try {
+        setHistoryLogs(JSON.parse(saved));
+      } catch (e) {
+        console.error('Error parsing analysis history:', e);
+      }
+    }
+  }, []);
 
   // Futures perpetual specific states
   const [leverage, setLeverage] = useState(20);
@@ -79,6 +95,18 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
     setTelegramStatus('idle');
 
     try {
+      // Map historyLogs to compact data points for Gemini learning ingestion
+      const pastAnalysesPayload = historyLogs.slice(0, 5).map(h => ({
+        pair: h.pair,
+        type: h.type,
+        style: h.style,
+        entryPrice: h.entryPrice,
+        takeProfit1: h.takeProfit1,
+        stopLoss: h.stopLoss,
+        confidence: h.confidence,
+        sentiment: h.sentiment
+      }));
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -86,8 +114,10 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
           pair: pair.toUpperCase(),
           currentPrice: parseFloat(currentPrice),
           timeframe,
+          tradingStyle,
           indicators,
-          customPrompt
+          customPrompt,
+          pastAnalyses: pastAnalysesPayload
         }),
       });
 
@@ -98,6 +128,12 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
 
       const signal: MarketSignal = data.signal;
       setActiveSignal(signal);
+
+      // Save to localStorage so that history is stored as cumulative AI context learning
+      const updatedHistory = [signal, ...historyLogs];
+      setHistoryLogs(updatedHistory);
+      localStorage.setItem('futuresmax_analysis_history', JSON.stringify(updatedHistory));
+
       onSignalGenerated(signal);
 
       // Trigger Auto Telegram if requested and configured
@@ -160,7 +196,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
 
         <form onSubmit={handleAnalyze} className="space-y-5">
           {/* Pair & Price row */}
-          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
             <div>
               <label className="block text-xs font-mono text-slate-400 uppercase mb-2">Simbol / Pair</label>
               <input
@@ -193,6 +229,20 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
                 {['M1', 'M5', 'M15', 'M30', 'H1', 'H4', 'D1', 'W1'].map((tf) => (
                   <option key={tf} value={tf}>{tf}</option>
                 ))}
+              </select>
+            </div>
+
+            <div>
+              <label className="block text-xs font-mono text-slate-400 uppercase mb-2">Gaya Trading / Strategy</label>
+              <select
+                value={tradingStyle}
+                onChange={(e) => setTradingStyle(e.target.value as any)}
+                className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-xs text-white focus:outline-none focus:border-slate-600 transition font-mono font-bold"
+              >
+                <option value="SCALP">⚡ SCALPING (Detik/Menit cepat)</option>
+                <option value="DAY TRADE">📅 DAY TRADING (Intraday harian)</option>
+                <option value="SWING">📈 SWING (Sedang multi-hari)</option>
+                <option value="POSITION">🚀 POSITION (Hold panjang minggu/bulan)</option>
               </select>
             </div>
           </div>
@@ -459,6 +509,24 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               );
             })()}
 
+            {/* AI Continuous Learning Feedback Banner */}
+            {activeSignal.learningFeedback && (
+              <div className="mt-6 bg-gradient-to-r from-emerald-950/40 via-emerald-920/10 to-slate-950/90 border border-emerald-500/25 p-4 rounded-xl flex items-start space-x-3 shadow-lg shadow-emerald-950/10">
+                <div className="p-1.5 bg-emerald-900/40 border border-emerald-500/30 text-[10px] uppercase font-mono font-black text-emerald-400 rounded-md tracking-wider flex items-center space-x-1 flex-shrink-0 animate-pulse">
+                  <Cpu size={12} />
+                  <span>AI LEARN</span>
+                </div>
+                <div>
+                  <h4 className="text-[11px] font-mono font-black text-emerald-400 uppercase tracking-widest flex items-center">
+                    PEMBELAJARAN MODEL BERKELANJUTAN (CONTINUOUS REINFORCEMENT)
+                  </h4>
+                  <p className="text-xs text-slate-350 leading-relaxed font-sans mt-0.5">
+                    {activeSignal.learningFeedback}
+                  </p>
+                </div>
+              </div>
+            )}
+
             {/* Analysis Rows (Indonesian) */}
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6 mt-6">
               <div className="bg-slate-950/40 p-5 border border-slate-800 rounded-xl">
@@ -513,6 +581,130 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
           </motion.div>
         )}
       </AnimatePresence>
+
+      {/* 🧠 RIWAYAT & SIRKUIT PEMBELAJARAN COGNITIVE AI */}
+      <div className="bg-slate-900 border border-slate-800 rounded-xl p-6 shadow-md mt-6">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 pb-3 border-b border-slate-800/60 mb-5">
+          <div className="flex items-center space-x-2.5">
+            <Cpu className="text-emerald-400" size={20} />
+            <div>
+              <h2 className="text-sm font-mono font-bold text-white tracking-wider uppercase">HISTORI & JURNAL BELAJAR AI (MEMORI COGNITIVE)</h2>
+              <p className="text-[10px] text-slate-500 font-mono uppercase">Database pola kognitif lokal untuk pembelajaran AI berkelanjutan</p>
+            </div>
+          </div>
+          {historyLogs.length > 0 && (
+            <button
+              onClick={() => {
+                if(window.confirm("Hapus semua riwayat analisis & memori kognitif lokal?")) {
+                  localStorage.removeItem('futuresmax_analysis_history');
+                  setHistoryLogs([]);
+                }
+              }}
+              className="text-[10px] text-red-400 hover:text-red-300 border border-red-900/40 bg-red-950/20 px-2.5 py-1 rounded-md font-mono font-bold transition uppercase cursor-pointer"
+            >
+              Reset Memori AI
+            </button>
+          )}
+        </div>
+
+        {historyLogs.length === 0 ? (
+          <div className="text-center py-8 text-slate-500 font-mono text-xs">
+            <AlertTriangle className="mx-auto mb-2 text-slate-600" size={20} />
+            <p className="uppercase">Belum ada riwayat aktivitas kognitif.</p>
+            <p className="text-[10px] text-slate-600 mt-1">Jalankan "Analisis Teknikal" di atas untuk menyimpan pemikiran pertama model.</p>
+          </div>
+        ) : (
+          <div className="space-y-4">
+            {/* Context Learning Dashboard Metrics */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4 bg-slate-950/45 p-4 rounded-xl border border-slate-800/60 text-xs font-mono">
+              <div className="space-y-0.5">
+                <span className="text-slate-500 block uppercase text-[10px]">Ukuran Memori LTM</span>
+                <span className="text-emerald-400 font-black text-sm">{historyLogs.length} Pola Analisis</span>
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 block uppercase text-[10px]">Model Utama</span>
+                <span className="text-slate-200 font-bold block">Gemini 3.5 Flash</span>
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 block uppercase text-[10px]/tight text-slate-500">Feedback Loop</span>
+                <span className="text-emerald-400 font-bold flex items-center space-x-1">
+                  <span className="w-1.5 h-1.5 rounded-full bg-emerald-400 animate-ping inline-block" />
+                  <span>AKTIF & SINKRON</span>
+                </span>
+              </div>
+              <div className="space-y-0.5">
+                <span className="text-slate-500 block uppercase text-[10px]">Gaya Dominan</span>
+                <span className="text-slate-200 font-bold block">
+                  {(() => {
+                    const styles = historyLogs.map(h => h.style);
+                    const mode = styles.reduce((a, b, i, arr) => 
+                      (arr.filter(v => v === a).length >= arr.filter(v => v === b).length ? a : b), 
+                      styles[0]
+                    );
+                    return mode || 'SCALP';
+                  })()}
+                </span>
+              </div>
+            </div>
+
+            {/* List of past analyses */}
+            <div className="space-y-3 max-h-96 overflow-y-auto pr-1">
+              {historyLogs.map((log) => {
+                const dateStr = new Date(log.timestamp).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' ' + new Date(log.timestamp).toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+                return (
+                  <div key={log.id} className="p-4 bg-slate-950 border border-slate-800 rounded-lg flex flex-col space-y-3 hover:border-slate-700 transition">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 font-mono text-xs">
+                      <div className="flex items-center space-x-2">
+                        <span className="text-white font-extrabold">{log.pair}</span>
+                        <span className={`text-[9px] font-black px-1.5 py-0.5 rounded ${
+                          log.type === 'BUY' ? 'bg-emerald-950 text-emerald-400' : (log.type === 'SELL' ? 'bg-rose-955 text-rose-400' : 'bg-slate-800 text-slate-300')
+                        }`}>
+                          {log.type}
+                        </span>
+                        <span className="bg-slate-900 border border-slate-800 text-slate-400 text-[9px] px-1.5 py-0.5 rounded uppercase font-bold">
+                          {log.style}
+                        </span>
+                        <span className="bg-slate-900 text-slate-500 text-[9px] px-1.5 py-0.5 rounded">
+                          {log.timeframe || 'M15'}
+                        </span>
+                      </div>
+                      <span className="text-[10px] text-slate-500">{dateStr}</span>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-[11px] font-mono bg-slate-900/60 p-2.5 rounded border border-slate-900">
+                      <div>
+                        <span className="text-slate-500 block text-[9px]">ENTRY PRICE</span>
+                        <span className="text-white font-bold">{log.entryPrice}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[9px]">TARGET PROFIT 1</span>
+                        <span className="text-emerald-400 font-bold">{log.takeProfit1}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[9px]">STOP LOSS</span>
+                        <span className="text-rose-400 font-bold">{log.stopLoss}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-500 block text-[9px]">KEPERCAYAAN</span>
+                        <span className={`font-bold ${
+                          log.confidence === 'HIGH' ? 'text-emerald-400' : (log.confidence === 'MEDIUM' ? 'text-amber-400' : 'text-rose-400')
+                        }`}>{log.confidence}</span>
+                      </div>
+                    </div>
+
+                    {log.learningFeedback && (
+                      <div className="text-xs bg-emerald-950/15 border border-emerald-950/40 rounded p-2.5 text-slate-400 font-sans leading-relaxed">
+                        <span className="text-[9px] font-mono font-bold text-emerald-400 block uppercase tracking-wider mb-0.5">🧠 Hasil Pembelajaran AI:</span>
+                        {log.learningFeedback}
+                      </div>
+                    )}
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }

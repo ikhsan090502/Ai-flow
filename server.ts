@@ -201,7 +201,7 @@ let signalsHistory: ServerSignal[] = [
 
 // POST Analyze with Gemini API
 app.post('/api/analyze', async (req, res) => {
-  const { pair, currentPrice, timeframe, indicators, customPrompt } = req.body;
+  const { pair, currentPrice, timeframe, indicators, customPrompt, tradingStyle, pastAnalyses } = req.body;
 
   if (!pair || !currentPrice) {
     return res.status(400).json({ error: 'Pair and currentPrice are required' });
@@ -213,30 +213,43 @@ app.post('/api/analyze', async (req, res) => {
     });
   }
 
+  // Format a compact summary of past analyses for AI context
+  const historyContext = Array.isArray(pastAnalyses) && pastAnalyses.length > 0
+    ? pastAnalyses.slice(0, 5).map((h: any, i: number) => {
+        return `[Analisis Ke-${i+1}] Aset: ${h.pair}, Tipe: ${h.type}, Style: ${h.style}, Entry: ${h.entryPrice}, TP1: ${h.takeProfit1}, SL: ${h.stopLoss}, Confidence: ${h.confidence}, Sentimen Singkat: ${h.sentiment ? h.sentiment.substring(0, 100) : ''}...`;
+      }).join('\n')
+    : 'Belum ada riwayat analisis terekam. Ini adalah analisis sirkuit awal Anda.';
+
   // Build high impact prompt
-  const systemPrompt = `Kamu adalah FuturesMax AI, sebuah sistem AI analis profesional elit di pasar Crypto, Forex, Komoditas, dan Saham Indonesia (IDX).
+  const systemPrompt = `Kamu adalah FuturesMax AI, sebuah sistem AI analis profesional elit di pasar Crypto, Forex, Komoditas, dan Saham Indonesia (IDX) yang dilengkapi dengan "Continuous Learning Cognitive Circuitry" (Sistem Memori Pembelajaran Berkelanjutan).
 Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan parameter input dan memberikan rekomendasi serta sinyal perdagangan (Signal Entry) yang akurat dan kredibel.
 
 Jika aset adalah Saham Indonesia (misal: BBCA, BBRI, TLKM, GOTO, BMRI, ASII), analisislah dengan dinamika khas pasar saham domestik Indonesia (IHSG / BEI) dan pastikan memberikan harga entryPrice, takeProfit1, takeProfit2, dan stopLoss dalam bentuk angka bulat Rupiah (integer tanpa decimal sepeser pun).
 Jika indikator opsional mengandung 'Momentum Pembalikan', fokuskan analisis pada penemuan pola-pola pembalikan tren (reversal momentum) seperti bullish/bearish divergence, overbought/oversold exhaustion, double bottom/top, head and shoulders, atau harmonic patterns, serta konfirmasi kegagalan breakout (liquidity sweep).
 
-REKAYASA SINYAL:
+RIWAYAT ANALISIS TERDAHULU UNTUK PEMBELAJARAN (COGNITIVE MEMORY LOG):
+Gunakan riwayat di bawah ini untuk belajar dari keputusan masa lalu Anda sendiri. Pelajari pola-polanya agar keputusan sekarang memiliki sinergi akumulatif, lebih konsisten, dan menghindari pengulangan bias analisa yang tidak akurat:
+${historyContext}
+
+REKAYASA SINYAL SESUAI GAYA TRADING:
 - Tentukan jenis aksi trading: 'BUY', 'SELL', atau 'NEUTRAL'.
-- Sediakan style perdagangan terpopuler: 'SCALP' (Timeframe pendek / m5-m15), 'DAY TRADE' (m30-h1), atau 'SWING' (h4-d1).
+- Tentukan gaya trading ('style') di mana kamu WAJIB memprioritaskan gaya trading berikut: "${tradingStyle || 'bebas'}". Gaya trading ini harus diisi dengan salah satu dari pilihan format: 'SCALP' (Scalping detik/menit sangat cepat), 'DAY TRADE' (Day Trading harian/jam), 'SWING' (Swing Trading berhari-hari), atau 'POSITION' (Position Trading jangka panjang berminggu-minggu). Sesuaikan target rasio dan jarak persentase keuntungan dengan gaya ini (Scalp butuh target sangat tipis dan rapat; Position butuh target sangat jauh dan lebar).
 - Tentukan harga 'entryPrice' yang sangat rasional (berdekatan dengan harga sekarang yaitu ${currentPrice}).
-- Berikan target 'takeProfit1' dan 'takeProfit2' serta batas pengaman 'stopLoss' yang logis sesuai kaidah risk/reward ratio sehat (minimum 1:1.5 ketat).
+- Berikan target 'takeProfit1' dan 'takeProfit2' serta batas pengaman 'stopLoss' yang logis sesuai kaidah risk/reward ratio sehat (minimum 1:1.5 ketat). Untuk SCALP, gunakan pips/target yang rapat. Untuk POSITION atau SWING, gunakan pertimbangan jangka panjang.
 - Atur tingkat kepercayaan 'confidence': dapat berkisar antara 'HIGH', 'MEDIUM', atau 'LOW'.
 
 STRUKTUR ANALISIS (Tulis semua penjelasan dalam Bahasa Indonesia yang profesional, tegas, dan berbobot tanpa istilah main-main):
-- 'sentiment': Jelaskan dinamika pelaku pasar dengan detail, psikologi pembeli/penjual di area harga sekarang, dan korelasi volume transaksi.
-- 'mtfAnalysis': Jelaskan analisis multi-timeframe komprehensif, menghubungkan kerangka waktu besar (HTF) dan kerangka waktu kecil (LTF).
+- 'sentiment': Jelaskan dinamika pelaku pasar dengan detail, psikologi pembeli/penjual di area harga sekarang sesuai gaya trading "${tradingStyle || 'bebas'}", dan korelasi volume transaksi.
+- 'mtfAnalysis': Jelaskan analisis multi-timeframe komprehensif sesuai durasi investasi, menghubungkan kerangka waktu besar (HTF) dan kerangka waktu kecil (LTF).
 - 'bullishCase': Argumen teknikal dan alasan utama mengapa harga berpeluang naik (misal: support kokoh, fibonacci, indikator jenuh jual, pola harmonis).
 - 'bearishCase': Argumen teknikal dan alasan utama mengapa harga berpeluang turun (misal: jenuh beli, resistensi tangguh, supply zone, orderblock bearish).
+- 'learningFeedback': Berikan 1-2 kalimat analisis kritis/metakognitif tentang apa yang kamu pelajari dari riwayat masa lalu (jika ada) atau bagaimana sirkuit analisismu disempurnakan berdasarkan gaya trading "${tradingStyle || 'bebas'}" dan parameter instrumen ${pair} (misal: "Berdasarkan memori transaksi volatilitas tinggi di masa lalu, kami menyerap parameter baru untuk mengoptimalkan keandalan take profit pada ${pair}" atau "Mempelajari sirkuit historis, kami memperketat stop loss M15 guna mencegah slippage spread").
 
 PERHATIKAN HARGA YANG DIIKUTI:
 Pasangan aset: ${pair}
 Harga sekarang: ${currentPrice}
 Waktu analisis: ${timeframe || 'M15'}
+Gaya trading yang diminta: ${tradingStyle || 'Bebas / Sesuai Timeframe'}
 Indikator opsional bantuan: ${(indicators || []).join(', ')}
 ${customPrompt ? `Konteks atau catatan tambahan pengguna: ${customPrompt}` : ''}
 
@@ -264,10 +277,11 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
             sentiment: { type: Type.STRING },
             mtfAnalysis: { type: Type.STRING },
             bullishCase: { type: Type.STRING },
-            bearishCase: { type: Type.STRING }
+            bearishCase: { type: Type.STRING },
+            learningFeedback: { type: Type.STRING }
           },
           required: [
-            'pair', 'type', 'style', 'entryPrice', 'takeProfit1', 'takeProfit2', 'stopLoss', 'confidence', 'sentiment', 'mtfAnalysis', 'bullishCase', 'bearishCase'
+            'pair', 'type', 'style', 'entryPrice', 'takeProfit1', 'takeProfit2', 'stopLoss', 'confidence', 'sentiment', 'mtfAnalysis', 'bullishCase', 'bearishCase', 'learningFeedback'
           ]
         }
       }
@@ -307,6 +321,7 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
       pipsProfit: initialPips,
       status: (analysisResult.type === 'NEUTRAL' ? 'EXPIRED' : 'ACTIVE') as any,
       timestamp: Date.now(),
+      learningFeedback: analysisResult.learningFeedback || 'Memasukkan sirkuit metakognitif awal untuk memperluas database intelijen.'
     };
 
     // Store in historical signals list on the server so the browser dashboard picks it up!
@@ -321,6 +336,21 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
 
 // GET Signals History
 app.get('/api/signals', (req, res) => {
+  return res.json({ success: true, signals: signalsHistory });
+});
+
+// POST Resolve Signal status explicitly
+app.post('/api/signals/resolve', (req, res) => {
+  const { id, status, pipsProfit, currentPrice } = req.body;
+  const signal = signalsHistory.find(s => s.id === id);
+  if (signal) {
+    signal.status = status; // 'TAKE_PROFIT', 'STOP_LOSS', 'EXPIRED'
+    signal.pipsProfit = Number(pipsProfit);
+    if (currentPrice !== undefined) {
+      signal.currentPrice = Number(currentPrice);
+    }
+    signal.resolutionTimestamp = Date.now();
+  }
   return res.json({ success: true, signals: signalsHistory });
 });
 

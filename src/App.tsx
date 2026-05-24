@@ -6,10 +6,11 @@ import PerformanceDashboard from './components/PerformanceDashboard';
 import TelegramPanel from './components/TelegramPanel';
 import NewsSentimentHub from './components/NewsSentimentHub';
 import BrokerRecommendations from './components/BrokerRecommendations';
-import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins } from 'lucide-react';
+import MarketSessionsCalendar from './components/MarketSessionsCalendar';
+import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins, Calendar } from 'lucide-react';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'analyzer' | 'dashboard' | 'telegram' | 'broker'>('analyzer');
+  const [activeTab, setActiveTab] = useState<'analyzer' | 'dashboard' | 'telegram' | 'broker' | 'calendar'>('analyzer');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
   const [signals, setSignals] = useState<MarketSignal[]>([]);
@@ -77,6 +78,23 @@ export default function App() {
   // When a new signal is successfully compiled by Gemini, insert it into our local list
   const handleNewSignalCreated = (newSignal: MarketSignal) => {
     setSignals(prev => [newSignal, ...prev]);
+  };
+
+  // Explicitly update signal status to TP or SL on the server for full transparency of performance tracking
+  const handleResolveSignal = async (id: string, status: 'TAKE_PROFIT' | 'STOP_LOSS' | 'EXPIRED', pips: number, currentPrice?: number) => {
+    try {
+      const response = await fetch('/api/signals/resolve', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id, status, pipsProfit: pips, currentPrice })
+      });
+      const data = await response.json();
+      if (response.ok && data.success) {
+        setSignals(data.signals);
+      }
+    } catch (err) {
+      console.error('Failed to resolve signal status on Backend:', err);
+    }
   };
 
   // Trigger click auto-fill binding from the Live Feed grid
@@ -153,6 +171,18 @@ export default function App() {
           </button>
 
           <button
+            onClick={() => setActiveTab('calendar')}
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+              activeTab === 'calendar' 
+                ? 'bg-slate-800 text-white shadow-sm' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <Calendar size={14} />
+            <span>Sesi & Kalender</span>
+          </button>
+
+          <button
             onClick={() => setActiveTab('broker')}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
               activeTab === 'broker' 
@@ -205,12 +235,17 @@ export default function App() {
             <PerformanceDashboard
               signals={signals}
               onResetHistory={handleResetHistory}
+              onResolveSignal={handleResolveSignal}
               isLoading={isLoading}
             />
           )}
 
           {activeTab === 'broker' && (
             <BrokerRecommendations />
+          )}
+
+          {activeTab === 'calendar' && (
+            <MarketSessionsCalendar onInjectContext={handleInjectNewsContext} />
           )}
 
           {activeTab === 'telegram' && (

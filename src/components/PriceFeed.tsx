@@ -154,6 +154,19 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
                               ? 'SAHAM' 
                               : 'FX'}
                     </span>
+                    {asset.exchange && (
+                      <span className={`text-[8px] font-extrabold px-1 rounded font-mono tracking-tight uppercase ${
+                        asset.exchange === 'Bitunix' 
+                          ? 'bg-amber-950/90 border border-amber-500/30 text-amber-400' 
+                          : asset.exchange === 'MEXC' 
+                            ? 'bg-blue-950/90 border border-blue-500/30 text-blue-400' 
+                            : asset.exchange === 'Bybit'
+                              ? 'bg-amber-500/10 border border-amber-500/20 text-orange-400'
+                              : 'bg-slate-800 border border-slate-700 text-slate-400'
+                      }`}>
+                        {asset.exchange}
+                      </span>
+                    )}
                   </div>
                   <div className="text-[10px] text-slate-500 font-mono uppercase truncate max-w-[130px]">
                     {asset.name}
@@ -187,8 +200,8 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
       </div>
 
       <div className="mt-4 pt-3 border-t border-slate-900 text-[10px] text-slate-500 font-mono flex items-center justify-between">
-        <span>SINKRONISASI BURSA: BINANCE</span>
-        <span>DELAY: ~10MS</span>
+        <span>SINKRONISASI: MULTI-BURSA (BINANCE, BITUNIX, MEXC, BYBIT)</span>
+        <span>DELAY: &lt;12MS</span>
       </div>
     </div>
   );

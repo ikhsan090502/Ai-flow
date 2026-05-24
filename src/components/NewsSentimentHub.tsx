@@ -34,6 +34,66 @@ export default function NewsSentimentHub({ onInjectNewsContext, onPriceImpactApp
   // Pre-configured realistic impact news
   const [newsList, setNewsList] = useState<NewsItem[]>([
     {
+      id: 'news_id_1',
+      headline: 'Bank Indonesia (BI) Pangkas Suku Bunga Acuan (BI-Rate) ke 5.75%, Sektor Finansial Bergairah',
+      sentiment: 'strong_bullish',
+      impactPercent: 5.40,
+      targetAsset: 'BBRI',
+      category: 'Macro',
+      timeAgo: '4m yang lalu',
+      description: 'Langkah BI menurunkan suku bunga acuan disambut sangat positif oleh investor pasar modal Indonesia. Biaya dana perbankan diproyeksikan menyusut tajam, mengerek pertumbuhan kredit Bank Rakyat Indonesia.'
+    },
+    {
+      id: 'news_id_2',
+      headline: 'Ekosistem GoTo Catat EBITDA Positif Dua Kuartal Berturut-turut, Investor Ritel Berpesta',
+      sentiment: 'strong_bullish',
+      impactPercent: 12.50,
+      targetAsset: 'GOTO',
+      category: 'Whale Trade',
+      timeAgo: '12m yang lalu',
+      description: 'Sinergi unit on-demand service (Gojek) dan fintech (GTF) mempercepat jalur profitabilitas GOTO secara berkelanjutan. Broker terpantau melakukan aksi beli bersih berantai.'
+    },
+    {
+      id: 'news_id_3',
+      headline: 'Aliran Dana Asing Saham RI (Net Inflow) Sentuh Rp 1.2T, Saham BBCA Sentuh Rekor Tertinggi Baru',
+      sentiment: 'strong_bullish',
+      impactPercent: 3.50,
+      targetAsset: 'BBCA',
+      category: 'Macro',
+      timeAgo: '22m yang lalu',
+      description: 'Sentimen kestabilan moneter domestik mendorong dana pensiun asing merealokasikan aset ke emiten perbankan kapitalisasi terbesar di bursa efek Indonesia.'
+    },
+    {
+      id: 'news_id_4',
+      headline: 'Pertumbuhan GDP Kuartal I Indonesia Sentuh 5.17%, Lampaui Estimasi Konsensus Moody\'s',
+      sentiment: 'bullish',
+      impactPercent: 4.10,
+      targetAsset: 'BMRI',
+      category: 'Macro',
+      timeAgo: '1j yang lalu',
+      description: 'Konsumsi rumah tangga yang kokoh di pulau Jawa dan Kalimantan mendongkrak optimisme kinerja penyaluran obligasi dan modal kerja Bank Mandiri di tahun ini.'
+    },
+    {
+      id: 'news_id_5',
+      headline: 'Astra International (ASII) Resmi Tanda Tangani Investasi Joint-Venture Perakitan EV Rakitan Lokal $350 Juta',
+      sentiment: 'bullish',
+      impactPercent: 4.80,
+      targetAsset: 'ASII',
+      category: 'Regulatory',
+      timeAgo: '2j yang lalu',
+      description: 'Grup Astra memperkuat dominasi pasar suku cadang otomotif di Indonesia demi menyongsong pergeseran ke ekosistem elektrifikasi EV di tanah air secara agresif.'
+    },
+    {
+      id: 'news_id_6',
+      headline: 'Telkom (TLKM) Teken Kontrak Kemitraan Layanan Internet Satelit Orbit Rendah & Pusat AI Nasional',
+      sentiment: 'bullish',
+      impactPercent: 3.25,
+      targetAsset: 'TLKM',
+      category: 'Macro',
+      timeAgo: '3j yang lalu',
+      description: 'Kerja sama ini diestimasikan mampu memangkas waktu latensi dan memperluas jangkauan broadband area luar pulau Jawa secara eksponensial.'
+    },
+    {
       id: 'news_1',
       headline: 'Akumulasi Whale Terbesar Tahun Ini Terdeteksi, $400M SOL Ditarik dari Bursa',
       sentiment: 'strong_bullish',

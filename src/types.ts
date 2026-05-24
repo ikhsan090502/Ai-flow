@@ -6,6 +6,7 @@ export interface Asset {
   type: AssetType;
   baseAsset: string;   // e.g., BTC, EUR
   quoteAsset: string;  // e.g., USDT, USD
+  exchange?: string;   // e.g., Bitunix, MEXC, Binance, Bybit
 }
 
 export interface LivePrice {
@@ -39,6 +40,7 @@ export interface MarketSignal {
   status: SignalStatus;
   timestamp: number;       // creation time
   resolutionTimestamp?: number; // time when hit TP/SL/Expired
+  learningFeedback?: string; // AI continuous learning feedback statement
 }
 
 export interface TelegramConfig {

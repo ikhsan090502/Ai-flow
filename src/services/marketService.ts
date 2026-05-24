@@ -57,6 +57,26 @@ const FIXED_SEEDS: Record<string, { price: number; change24h: number }> = {
   ENAUSDT: { price: 0.5240, change24h: -3.10 },
   TIAUSDT: { price: 5.4200, change24h: -4.85 },
 
+  // Bitunix & MEXC explosive assets seeds (High potential / thousand percent runners!)
+  PNUTUSDT: { price: 0.8425, change24h: 312.45 },
+  NEIROUSDT: { price: 0.001842, change24h: 84.20 },
+  GOATUSDT: { price: 0.6450, change24h: 125.10 },
+  ACTUSDT: { price: 0.3852, change24h: 215.40 },
+  BANUSDT: { price: 0.2245, change24h: -14.20 },
+  SPXUSDT: { price: 0.5482, change24h: 35.12 },
+  MOGUSDT: { price: 0.00000185, change24h: 42.10 },
+  MOODENGUSDT: { price: 0.1852, change24h: -8.15 },
+  LUCEUSDT: { price: 0.1245, change24h: 185.20 },
+  GRASSUSDT: { price: 1.9540, change24h: 12.80 },
+  GIGAUSDT: { price: 0.0485, change24h: -5.40 },
+  FIDAUSDT: { price: 0.2450, change24h: 8.50 },
+  SLERFUSDT: { price: 0.2842, change24h: -22.10 },
+  FWOGUSDT: { price: 0.1542, change24h: 112.50 },
+  MYROUSDT: { price: 0.1152, change24h: 4.50 },
+  COQUSDT: { price: 0.00000215, change24h: -3.80 },
+  BOBUSDT: { price: 0.00002542, change24h: 15.60 },
+  BABYDOGEUSDT: { price: 0.00000284, change24h: 9.20 },
+
   // Standard Crypto Futures Fallbacks
   BTCUSDT_PERP: { price: 68485.00, change24h: 1.52 },
   ETHUSDT_PERP: { price: 3422.10, change24h: 2.22 },
