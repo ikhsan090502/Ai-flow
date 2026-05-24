@@ -49,6 +49,16 @@ export interface TelegramConfig {
   enabled: boolean;
 }
 
+export interface PriceAlert {
+  id: string;
+  symbol: string;
+  targetPrice: number;
+  condition: 'ABOVE' | 'BELOW';
+  status: 'PENDING' | 'TRIGGERED';
+  createdAt: number;
+  triggeredAt?: number;
+}
+
 export interface SignalHistoryStats {
   totalSignals: number;
   winRate: number;        // win percentage

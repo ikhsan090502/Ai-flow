@@ -458,6 +458,38 @@ app.post('/api/telegram/test', async (req, res) => {
   }
 });
 
+// POST Send custom price alert notification via Telegram
+app.post('/api/telegram/send-alert', async (req, res) => {
+  const { botToken, chatId, alertMessage } = req.body;
+
+  if (!botToken || !chatId || !alertMessage) {
+    return res.status(400).json({ error: 'Bot Token, Chat ID, and alertMessage are required' });
+  }
+
+  try {
+    const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
+    const response = await fetch(telegramUrl, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        chat_id: chatId,
+        text: alertMessage,
+        parse_mode: 'HTML',
+      }),
+    });
+
+    const result = await response.json();
+    if (!result.ok) {
+      throw new Error(result.description || 'Gagal mengirimkan notifikasi.');
+    }
+
+    return res.json({ success: true, result });
+  } catch (error: any) {
+    console.error('Telegram price alert proxy error:', error);
+    return res.status(500).json({ error: error.message || 'Gagal mengirimkan notifikasi ke Telegram.' });
+  }
+});
+
 // Serve frontend build files in production or hook into Vite dev mode
 async function startServer() {
   if (process.env.NODE_ENV !== 'production') {

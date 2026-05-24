@@ -15,6 +15,11 @@ export const SUPPORTED_ASSETS: Asset[] = [
   { symbol: 'ADAUSDT', name: 'Cardano / Tether', type: 'crypto', baseAsset: 'ADA', quoteAsset: 'USDT', exchange: 'Binance' },
   { symbol: 'AVAXUSDT', name: 'Avalanche / Tether', type: 'crypto', baseAsset: 'AVAX', quoteAsset: 'USDT', exchange: 'Binance' },
   { symbol: 'LINKUSDT', name: 'Chainlink / Tether', type: 'crypto', baseAsset: 'LINK', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'APTUSDT', name: 'Aptos / Tether', type: 'crypto', baseAsset: 'APT', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'NEARUSDT', name: 'NEAR Protocol / Tether', type: 'crypto', baseAsset: 'NEAR', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'INJUSDT', name: 'Injective / Tether', type: 'crypto', baseAsset: 'INJ', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'OPUSDT', name: 'Optimism / Tether', type: 'crypto', baseAsset: 'OP', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'ARBUSDT', name: 'Arbitrum / Tether', type: 'crypto', baseAsset: 'ARB', quoteAsset: 'USDT', exchange: 'Binance' },
 
   // --- BITUNIX SPOT & FUTURES ROCKETS (Low-Caps with potential to run thousands of percent, NO KYC required) ---
   { symbol: 'GNUUSDT', name: 'GNU Network (Bitunix Gem)', type: 'crypto', baseAsset: 'GNU', quoteAsset: 'USDT', exchange: 'Bitunix' },
@@ -48,6 +53,10 @@ export const SUPPORTED_ASSETS: Asset[] = [
   { symbol: 'COQUSDT', name: 'Coq Inu Avalanche', type: 'crypto', baseAsset: 'COQ', quoteAsset: 'USDT', exchange: 'MEXC' },
   { symbol: 'BOBUSDT', name: 'Bob AI Explainer', type: 'crypto', baseAsset: 'BOB', quoteAsset: 'USDT', exchange: 'MEXC' },
   { symbol: 'BABYDOGEUSDT', name: 'Baby Dogecoin (MEXC)', type: 'crypto', baseAsset: 'BABYDOGE', quoteAsset: 'USDT', exchange: 'MEXC' },
+  { symbol: 'KASUSDT', name: 'Kaspa / Tether', type: 'crypto', baseAsset: 'KAS', quoteAsset: 'USDT', exchange: 'MEXC' },
+  { symbol: 'JASMYUSDT', name: 'JasmyCoin / Tether', type: 'crypto', baseAsset: 'JASMY', quoteAsset: 'USDT', exchange: 'MEXC' },
+  { symbol: 'ZIGUSDT', name: 'Zignaly AI / Tether', type: 'crypto', baseAsset: 'ZIG', quoteAsset: 'USDT', exchange: 'MEXC' },
+  { symbol: 'CROWUSDT', name: 'Crow Finance (MEXC)', type: 'crypto', baseAsset: 'CROW', quoteAsset: 'USDT', exchange: 'MEXC' },
 
   // --- BYBIT DERIVATIVES & NEW ALT GEMS ---
   { symbol: 'ONDOUSDT', name: 'Ondo Finance RWA (Bybit)', type: 'crypto', baseAsset: 'ONDO', quoteAsset: 'USDT', exchange: 'Bybit' },
@@ -62,6 +71,10 @@ export const SUPPORTED_ASSETS: Asset[] = [
   { symbol: 'PYTHUSDT', name: 'Pyth Oracle Feed (Bybit)', type: 'crypto', baseAsset: 'PYTH', quoteAsset: 'USDT', exchange: 'Bybit' },
   { symbol: 'ENAUSDT', name: 'Ethena Synthetic Dollar', type: 'crypto', baseAsset: 'ENA', quoteAsset: 'USDT', exchange: 'Bybit' },
   { symbol: 'TIAUSDT', name: 'Celestia Modular DA', type: 'crypto', baseAsset: 'TIA', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'STXUSDT', name: 'Stacks Bitcoin L2 (Bybit)', type: 'crypto', baseAsset: 'STX', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'ARUSDT', name: 'Arweave Storage (Bybit)', type: 'crypto', baseAsset: 'AR', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'LDOUSDT', name: 'Lido DAO Liquid Staking', type: 'crypto', baseAsset: 'LDO', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'COREUSDT', name: 'Core DAO Layer 1', type: 'crypto', baseAsset: 'CORE', quoteAsset: 'USDT', exchange: 'Bybit' },
 
   // ==================== CRYPTO FUTURES (PERPETUAL CONTRACTS LISTED BY BROKER) ====================
   // Note: These perpetuals allow up to 125x leverage simulation on their target platform!
@@ -76,6 +89,11 @@ export const SUPPORTED_ASSETS: Asset[] = [
   { symbol: 'ADAUSDT_PERP', name: 'ADA Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'ADA', quoteAsset: 'USDT', exchange: 'Binance' },
   { symbol: 'AVAXUSDT_PERP', name: 'AVAX Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'AVAX', quoteAsset: 'USDT', exchange: 'Binance' },
   { symbol: 'LINKUSDT_PERP', name: 'LINK Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'LINK', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'APTUSDT_PERP', name: 'APT Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'APT', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'NEARUSDT_PERP', name: 'NEAR Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'NEAR', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'INJUSDT_PERP', name: 'INJ Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'INJ', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'OPUSDT_PERP', name: 'OP Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'OP', quoteAsset: 'USDT', exchange: 'Binance' },
+  { symbol: 'ARBUSDT_PERP', name: 'ARB Perpetual Futures (Binance)', type: 'crypto_futures', baseAsset: 'ARB', quoteAsset: 'USDT', exchange: 'Binance' },
 
   // Bitunix Perpetuals (Epic High-Leverage Meme Gems & Micro-caps)
   { symbol: 'GNUUSDT_PERP', name: 'GNU Perpetual Futures (Bitunix)', type: 'crypto_futures', baseAsset: 'GNU', quoteAsset: 'USDT', exchange: 'Bitunix' },
@@ -107,6 +125,9 @@ export const SUPPORTED_ASSETS: Asset[] = [
   { symbol: 'FWOGUSDT_PERP', name: 'FWOG Perpetual Futures (MEXC)', type: 'crypto_futures', baseAsset: 'FWOG', quoteAsset: 'USDT', exchange: 'MEXC' },
   { symbol: 'MYROUSDT_PERP', name: 'MYRO Perpetual Futures (MEXC)', type: 'crypto_futures', baseAsset: 'MYRO', quoteAsset: 'USDT', exchange: 'MEXC' },
   { symbol: 'COQUSDT_PERP', name: 'COQ Perpetual Futures (MEXC)', type: 'crypto_futures', baseAsset: 'COQ', quoteAsset: 'USDT', exchange: 'MEXC' },
+  { symbol: 'KASUSDT_PERP', name: 'KAS Perpetual Futures (MEXC)', type: 'crypto_futures', baseAsset: 'KAS', quoteAsset: 'USDT', exchange: 'MEXC' },
+  { symbol: 'JASMYUSDT_PERP', name: 'JASMY Perpetual Futures (MEXC)', type: 'crypto_futures', baseAsset: 'JASMY', quoteAsset: 'USDT', exchange: 'MEXC' },
+  { symbol: 'ZIGUSDT_PERP', name: 'ZIG Perpetual Futures (MEXC)', type: 'crypto_futures', baseAsset: 'ZIG', quoteAsset: 'USDT', exchange: 'MEXC' },
 
   // Bybit Perpetuals (Advanced Tech & Mid-caps)
   { symbol: 'ONDOUSDT_PERP', name: 'ONDO Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'ONDO', quoteAsset: 'USDT', exchange: 'Bybit' },
@@ -121,6 +142,10 @@ export const SUPPORTED_ASSETS: Asset[] = [
   { symbol: 'PYTHUSDT_PERP', name: 'PYTH Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'PYTH', quoteAsset: 'USDT', exchange: 'Bybit' },
   { symbol: 'ENAUSDT_PERP', name: 'ENA Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'ENA', quoteAsset: 'USDT', exchange: 'Bybit' },
   { symbol: 'TIAUSDT_PERP', name: 'TIA Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'TIA', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'STXUSDT_PERP', name: 'STX Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'STX', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'ARUSDT_PERP', name: 'AR Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'AR', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'LDOUSDT_PERP', name: 'LDO Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'LDO', quoteAsset: 'USDT', exchange: 'Bybit' },
+  { symbol: 'COREUSDT_PERP', name: 'CORE Perpetual Futures (Bybit)', type: 'crypto_futures', baseAsset: 'CORE', quoteAsset: 'USDT', exchange: 'Bybit' },
 
   // --- FOREX ---
   { symbol: 'EURUSD', name: 'Euro / US Dollar', type: 'forex', baseAsset: 'EUR', quoteAsset: 'USD', exchange: 'OANDA' },

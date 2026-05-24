@@ -322,11 +322,11 @@ export default function PerformanceDashboard({ signals, onResetHistory, onResolv
           <table className="w-full text-left border-collapse select-none">
             <thead>
               <tr className="border-b border-slate-800 text-slate-500 font-mono text-[10px] uppercase font-bold">
-                <th className="py-3 px-4 font-bold">WAKTU ANALISIS (INDONESIA)</th>
+                <th className="py-3 px-4 font-bold hidden md:table-cell">WAKTU ANALISIS (INDONESIA)</th>
                 <th className="py-3 px-4 font-bold">SIMBOL</th>
                 <th className="py-3 px-4 font-bold">AKSI / TYPE</th>
-                <th className="py-3 px-4 font-bold">GAYA</th>
-                <th className="py-3 px-4 font-bold">ENTRY PRICE</th>
+                <th className="py-3 px-4 font-bold hidden sm:table-cell">GAYA</th>
+                <th className="py-3 px-4 font-bold hidden sm:table-cell">ENTRY PRICE</th>
                 <th className="py-3 px-4 font-bold">TARGET HARGA</th>
                 <th className="py-3 px-4 font-bold">KONDISI REAKSI (PROFIT/LOSS)</th>
                 <th className="py-3 px-4 font-bold text-right">RETURN (PIPS/PTS)</th>
@@ -347,7 +347,7 @@ export default function PerformanceDashboard({ signals, onResetHistory, onResolv
 
                 return (
                   <tr key={sig.id} className="hover:bg-slate-950/40 transition">
-                    <td className="py-4 px-4 text-slate-400 text-[11px] whitespace-nowrap">
+                    <td className="py-4 px-4 text-slate-400 text-[11px] whitespace-nowrap hidden md:table-cell">
                       {formatIndonesianDate(sig.timestamp)}
                     </td>
                     <td className="py-4 px-4 font-bold text-white mb-0.5">{sig.pair}</td>
@@ -358,8 +358,8 @@ export default function PerformanceDashboard({ signals, onResetHistory, onResolv
                         {sig.type}
                       </span>
                     </td>
-                    <td className="py-4 px-4 text-slate-400">{sig.style}</td>
-                    <td className="py-4 px-4 text-slate-300">{formatPrice(sig.entryPrice)}</td>
+                    <td className="py-4 px-4 text-slate-400 hidden sm:table-cell">{sig.style}</td>
+                    <td className="py-4 px-4 text-slate-300 hidden sm:table-cell">{formatPrice(sig.entryPrice)}</td>
                     <td className="py-4 px-4 text-slate-300">
                       <div className="space-y-0.5">
                         <span className="text-emerald-400 block text-[9.5px]">TP1: {formatPrice(sig.takeProfit1)}</span>

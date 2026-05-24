@@ -1,54 +1,18 @@
-import { useState, useEffect } from 'react';
-import { getLivePrices, tickLivePrices } from '../services/marketService';
+import { useState } from 'react';
 import { SUPPORTED_ASSETS } from '../assetsList';
 import { LivePrice, Asset } from '../types';
 import { Search, Coins, RefreshCw, Zap, TrendingUp, TrendingDown } from 'lucide-react';
 
 interface PriceFeedProps {
+  prices: Record<string, LivePrice>;
+  isLoading: boolean;
+  onRefresh: () => void;
   onSelectAsset: (asset: Asset, currentPrice: number) => void;
 }
 
-export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
-  const [prices, setPrices] = useState<Record<string, LivePrice>>({});
+export default function PriceFeed({ prices, isLoading, onRefresh, onSelectAsset }: PriceFeedProps) {
   const [search, setSearch] = useState('');
   const [activeCategory, setActiveCategory] = useState<'all' | 'crypto' | 'crypto_futures' | 'forex' | 'commodity' | 'stock'>('all');
-  const [isLoading, setIsLoading] = useState(true);
-
-  // Initial fetch and set interval loop
-  useEffect(() => {
-    async function initFeed() {
-      setIsLoading(true);
-      const initial = await getLivePrices();
-      setPrices(initial);
-      setIsLoading(false);
-    }
-    
-    initFeed();
-
-    // 1. Fetch real API rates every 12 seconds
-    const apiInterval = setInterval(async () => {
-      const updated = await getLivePrices();
-      setPrices(updated);
-    }, 12000);
-
-    // 2. Perform micro price ticks every 1.5 seconds for visual realism and dynamic charts
-    const tickInterval = setInterval(() => {
-      const ticked = tickLivePrices();
-      setPrices({ ...ticked });
-    }, 1500);
-
-    return () => {
-      clearInterval(apiInterval);
-      clearInterval(tickInterval);
-    };
-  }, []);
-
-  const handleRefresh = async () => {
-    setIsLoading(true);
-    const updated = await getLivePrices();
-    setPrices(updated);
-    setIsLoading(false);
-  };
 
   // Filter assets based on tabs and search bar
   const filteredAssets = SUPPORTED_ASSETS.filter((asset) => {
@@ -70,7 +34,7 @@ export default function PriceFeed({ onSelectAsset }: PriceFeedProps) {
         </div>
         
         <button 
-          onClick={handleRefresh}
+          onClick={onRefresh}
           className="text-slate-400 hover:text-white transition p-1 bg-slate-800 rounded-lg hover:bg-slate-700"
           title="Segarkan harga"
         >
