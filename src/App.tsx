@@ -8,11 +8,12 @@ import TelegramPanel from './components/TelegramPanel';
 import NewsSentimentHub from './components/NewsSentimentHub';
 import BrokerRecommendations from './components/BrokerRecommendations';
 import MarketSessionsCalendar from './components/MarketSessionsCalendar';
-import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins, Calendar, BellRing } from 'lucide-react';
+import TradeJournal from './components/TradeJournal';
+import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins, Calendar, BellRing, BookMarked } from 'lucide-react';
 import { getLivePrices, tickLivePrices } from './services/marketService';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'analyzer' | 'dashboard' | 'telegram' | 'broker' | 'calendar'>('analyzer');
+  const [activeTab, setActiveTab] = useState<'analyzer' | 'dashboard' | 'telegram' | 'broker' | 'calendar' | 'journal'>('analyzer');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
   const [signals, setSignals] = useState<MarketSignal[]>([]);
@@ -324,6 +325,20 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
           <span>FUTURESMAX KERNEL CORE: ONLINE</span>
           <span className="text-slate-700">|</span>
           <span>LATENCY: 12ms</span>
+          <span className="text-slate-700">|</span>
+          {(() => {
+            const day = new Date().getDay();
+            const isWeekend = day === 0 || day === 6;
+            return isWeekend ? (
+              <span className="text-rose-400 font-bold bg-rose-955/10 px-2 py-0.5 rounded border border-rose-900/30 animate-pulse">
+                ⚠️ AKHIR PEKAN: VALAS & SAHAM IDX TUTUP | KRIPTO BUATAN 24/7
+              </span>
+            ) : (
+              <span className="text-emerald-400 font-bold bg-emerald-955/10 px-2 py-0.5 rounded border border-emerald-900/15">
+                🟢 HARI KERJA: SEMUA PASAR SEHAT & AKTIF
+              </span>
+            );
+          })()}
         </div>
         <div className="flex items-center space-x-4">
           <span>UTC TIME: {new Date().toISOString().substring(11, 19)}</span>
@@ -407,6 +422,18 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
             <Send size={14} />
             <span>Bot Telegram</span>
           </button>
+
+          <button
+            onClick={() => setActiveTab('journal')}
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+              activeTab === 'journal' 
+                ? 'bg-slate-800 text-white shadow-sm' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <BookMarked size={14} />
+            <span>Jurnal & Review AI</span>
+          </button>
         </div>
       </header>
 
@@ -471,6 +498,10 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
               config={telegramConfig}
               onUpdateConfig={handleUpdateTelegramConfig}
             />
+          )}
+
+          {activeTab === 'journal' && (
+            <TradeJournal />
           )}
         </section>
       </main>

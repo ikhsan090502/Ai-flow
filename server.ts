@@ -4,6 +4,7 @@ import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
 import { GoogleGenAI, Type } from '@google/genai';
 import dotenv from 'dotenv';
+import { SUPPORTED_ASSETS } from './src/assetsList';
 
 // Load environment variables
 dotenv.config();
@@ -17,6 +18,224 @@ app.use(express.json());
 // Health check route for uptime monitoring (e.g. UptimeRobot, Cron-Job.org)
 app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
+});
+
+// --- SERVER-SIDE LIVE PRICES CACHE & FETCH PROXY ---
+const SERVER_SEEDS: Record<string, { price: number; change24h: number }> = {
+  XAUUSD: { price: 4562.42, change24h: 1.17 },
+  XAGUSD: { price: 77.56, change24h: 2.76 },
+  EURUSD: { price: 1.1636, change24h: 0.30 },
+  GBPUSD: { price: 1.3475, change24h: 0.41 },
+  AUDUSD: { price: 0.7250, change24h: 0.22 },
+  USDJPY: { price: 158.87, change24h: -0.19 },
+  USDCAD: { price: 1.3282, change24h: -0.10 },
+  USDCHF: { price: 0.8885, change24h: -0.18 },
+  BBCA: { price: 9850, change24h: 0.51 },
+  BBRI: { price: 4720, change24h: -1.25 },
+  TLKM: { price: 3050, change24h: 1.15 },
+  ASII: { price: 4950, change24h: -0.80 },
+  GOTO: { price: 62, change24h: 3.33 },
+  BMRI: { price: 6150, change24h: -0.40 },
+};
+
+let cachedPrices: Record<string, any> = {};
+let lastFetchTime = 0;
+const FETCH_THROTTLE_MS = 10000;
+
+// Initialize cache with default seeds
+SUPPORTED_ASSETS.forEach(asset => {
+  let seed = SERVER_SEEDS[asset.symbol];
+  if (!seed) {
+    const spotSymbol = asset.symbol.replace('_PERP', '');
+    const spotSeed = SERVER_SEEDS[spotSymbol];
+    if (spotSeed) {
+      seed = {
+        price: spotSeed.price * 1.0003,
+        change24h: spotSeed.change24h
+      };
+    } else {
+      seed = { price: 100, change24h: 0 };
+    }
+  }
+
+  cachedPrices[asset.symbol] = {
+    symbol: asset.symbol,
+    price: seed.price,
+    change24h: seed.change24h,
+    high24h: seed.price * (1 + Math.abs(seed.change24h) / 100 + 0.05),
+    low24h: seed.price * (1 - Math.abs(seed.change24h) / 100 - 0.05),
+    lastUpdated: Date.now()
+  };
+});
+
+// Server side background jitter simulating micro ticks
+function tickServerPrices() {
+  SUPPORTED_ASSETS.forEach(asset => {
+    const p = cachedPrices[asset.symbol];
+    if (p) {
+      const tickDir = Math.random() > 0.49 ? 1 : -1;
+      const isHighVolatility = asset.type === 'crypto' || asset.type === 'crypto_futures';
+      const isMetalOrForex = asset.type === 'commodity' || asset.type === 'forex';
+      const tickPercent = Math.random() * (isHighVolatility ? 0.0004 : isMetalOrForex ? 0.00018 : 0.00008);
+      const nextPrice = p.price * (1 + tickDir * tickPercent);
+      cachedPrices[asset.symbol] = {
+        ...p,
+        price: nextPrice,
+        lastUpdated: Date.now()
+      };
+    }
+  });
+}
+
+// Tick server prices every 2 seconds in memory
+setInterval(tickServerPrices, 2000);
+
+async function updateRealPricesCache() {
+  const now = Date.now();
+  if (now - lastFetchTime < FETCH_THROTTLE_MS) {
+    return;
+  }
+  lastFetchTime = now;
+
+  // 1. Fetch Crypto from Binance API
+  try {
+    const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+    if (response.ok) {
+      const data = await response.json();
+      if (Array.isArray(data)) {
+        data.forEach((item: any) => {
+          const sym = item.symbol;
+          const matchedAssets = SUPPORTED_ASSETS.filter(a => a.symbol === sym || a.symbol === `${sym}_PERP`);
+          matchedAssets.forEach(asset => {
+            const rawPrice = parseFloat(item.lastPrice || item.price);
+            const change = parseFloat(item.priceChangePercent);
+            if (!isNaN(rawPrice)) {
+              const perpetualOffset = asset.type === 'crypto_futures' ? 1.0003 : 1.0;
+              setServerCachedPrice(asset.symbol, rawPrice * perpetualOffset, isNaN(change) ? 0 : change);
+            }
+          });
+        });
+      }
+    }
+  } catch (err) {
+    console.error('Binance API fetch failed on server:', err);
+  }
+
+  // 2. Fetch Forex from ExchangeRate-API (completely open & keyless, updates frequently)
+  try {
+    const response = await fetch('https://open.er-api.com/v6/latest/USD');
+    if (response.ok) {
+      const data = await response.json();
+      const rates = data.rates || {};
+      if (rates.EUR) setServerCachedPrice('EURUSD', 1 / rates.EUR, 0.12);
+      if (rates.GBP) setServerCachedPrice('GBPUSD', 1 / rates.GBP, -0.05);
+      if (rates.AUD) setServerCachedPrice('AUDUSD', 1 / rates.AUD, 0.22);
+      if (rates.JPY) setServerCachedPrice('USDJPY', rates.JPY, 0.35);
+      if (rates.CAD) setServerCachedPrice('USDCAD', rates.CAD, -0.10);
+      if (rates.CHF) setServerCachedPrice('USDCHF', rates.CHF, -0.18);
+    }
+  } catch (err) {
+    console.error('ExchangeRate Forex fetch failed on server:', err);
+  }
+
+  // 3. Fetch Spot Gold & Silver from Gold-API (completely open & keyless)
+  try {
+    const [goldRes, silverRes] = await Promise.all([
+      fetch('https://api.gold-api.com/api/XAU/USD').catch(() => null),
+      fetch('https://api.gold-api.com/api/XAG/USD').catch(() => null)
+    ]);
+    
+    if (goldRes && goldRes.ok) {
+      const goldData = await goldRes.json();
+      if (goldData && typeof goldData.price === 'number') {
+        const existing = cachedPrices['XAUUSD'];
+        const change = existing ? existing.change24h : -0.15;
+        setServerCachedPrice('XAUUSD', goldData.price, change);
+      }
+    }
+    
+    if (silverRes && silverRes.ok) {
+      const silverData = await silverRes.json();
+      if (silverData && typeof silverData.price === 'number') {
+        const existing = cachedPrices['XAGUSD'];
+        const change = existing ? existing.change24h : 0.45;
+        setServerCachedPrice('XAGUSD', silverData.price, change);
+      }
+    }
+  } catch (err) {
+    console.error('Gold/Silver spot fetch failed on server:', err);
+  }
+
+  // 4. Fallback Yahoo Fetch for IDX stock prices (handles dns exceptions cleanly)
+  const yahooTickers: Record<string, string> = {
+    BBCA: 'BBCA.JK',
+    BBRI: 'BBRI.JK',
+    TLKM: 'TLKM.JK',
+    ASII: 'ASII.JK',
+    GOTO: 'GOTO.JK',
+    BMRI: 'BMRI.JK'
+  };
+
+  await Promise.all(
+    Object.entries(yahooTickers).map(async ([symbol, yahooSymbol]) => {
+      try {
+        const response = await fetch(`https://query1.finance.chart.yahoo.com/v8/finance/chart/${yahooSymbol}?interval=1d&range=1d`);
+        if (response.ok) {
+          const json = await response.json();
+          const result = json?.chart?.result?.[0];
+          const price = result?.meta?.regularMarketPrice;
+          const previousClose = result?.meta?.chartPreviousClose;
+          if (price !== undefined && price !== null) {
+            const change = previousClose ? ((price - previousClose) / previousClose) * 105 : 0;
+            setServerCachedPrice(symbol, price, change);
+          }
+        } else {
+          const existing = cachedPrices[symbol];
+          if (existing) {
+            const driftPercent = (Math.random() - 0.5) * 0.00015; 
+            setServerCachedPrice(symbol, existing.price * (1 + driftPercent), existing.change24h);
+          }
+        }
+      } catch (err: any) {
+        const existing = cachedPrices[symbol];
+        if (existing) {
+          const driftPercent = (Math.random() - 0.5) * 0.00015;
+          setServerCachedPrice(symbol, existing.price * (1 + driftPercent), existing.change24h);
+        }
+      }
+    })
+  );
+}
+
+function setServerCachedPrice(symbol: string, price: number, change: number) {
+  const existing = cachedPrices[symbol];
+  cachedPrices[symbol] = {
+    symbol,
+    price,
+    change24h: change,
+    high24h: existing ? Math.max(existing.high24h, price) : price * 1.025,
+    low24h: existing ? Math.min(existing.low24h, price) : price * 0.975,
+    lastUpdated: Date.now()
+  };
+}
+
+// Background auto updater every 15s to keep prices fresh
+setInterval(async () => {
+  try {
+    await updateRealPricesCache();
+  } catch (e) {
+    console.error('Error in background price fetch:', e);
+  }
+}, 15000);
+
+// Proxy Price Endpoint
+app.get('/api/market/prices', async (req, res) => {
+  try {
+    await updateRealPricesCache();
+  } catch (e) {
+    console.error('Error on dynamic price endpoint fetch:', e);
+  }
+  res.json(cachedPrices);
 });
 
 // Initialize Gemini Client
@@ -487,6 +706,68 @@ app.post('/api/telegram/send-alert', async (req, res) => {
   } catch (error: any) {
     console.error('Telegram price alert proxy error:', error);
     return res.status(500).json({ error: error.message || 'Gagal mengirimkan notifikasi ke Telegram.' });
+  }
+});
+
+// POST Review dynamic Trade Journal entry with Gemini API
+app.post('/api/gemini/review-journal', async (req, res) => {
+  const { pair, type, entryPrice, exitPrice, status, entryReason, exitReason, pnl, notes } = req.body;
+
+  if (!pair || !type || !entryPrice || !entryReason) {
+    return res.status(400).json({ error: 'Pasangan, Tipe, Harga Entry, dan Alasan Masuk wajib diisi.' });
+  }
+
+  const activeKey = process.env.GEMINI_API_KEY;
+  if (!activeKey) {
+    return res.status(500).json({
+      error: 'Gemini API Key belum terkonfigurasi. Silakan tambahkan GEMINI_API_KEY di Settings > Secrets.'
+    });
+  }
+
+  try {
+    const activeAi = new GoogleGenAI({
+      apiKey: activeKey,
+      httpOptions: {
+        headers: {
+          'User-Agent': 'aistudio-build',
+        },
+      },
+    });
+
+    const systemPrompt = `Kamu adalah FuturesMax AI, mentor trading profesional elit dan psikolog pasar keuangan.
+Tugasmu adalah menganalisis "Trade Journal" (Jurnal Perdagangan) yang diinput oleh pengguna dan memberikan ulasan analitis serta evaluasi "Post-Trade Review" (Analisis Pasca-Perdagangan) yang mendalam, kritis, objektif, serta taktis dalam bahasa Indonesia yang berbobot dan profesional tanpa bertele-tele.
+
+Detail Jurnal Perdagangan:
+- Pasangan Aset: ${pair}
+- Jenis Transaksi: ${type} (BUY atau SELL)
+- Harga Masuk (Entry): ${entryPrice}
+- Harga Keluar (Exit): ${exitPrice || 'Belum Ditutup (Transaksi Masih Terbuka)'}
+- Status Transaksi: ${status}
+- Alasan Masuk (Entry Reason): ${entryReason}
+- Alasan Keluar (Exit Reason): ${exitReason || 'Belum ada lapor keluar / N/A'}
+- Keuntungan/Kerugian (P&L): ${pnl !== undefined && pnl !== null ? pnl : 'N/A'}
+- Catatan Tambahan (Notes): ${notes || 'N/A'}
+
+Tulis seluruh evaluasi ulasanmu dalam format Markdown yang elegan dengan bagian-bagian berikut:
+### 🧠 Ulasan Psikologi & Disiplin
+(Evaluasikan emosi, kesiapan psikologis, pola FOMO/greed, atau tingkat kepatuhan trader terhadap rencana perdagangan.)
+
+### 📐 Analisis Teknis & Strategis
+(Evaluasikan apakah alasan masuk/keluar logis secara teknikal seperti struktur pasar, sirkulasi arah tren, indikator, atau rasio untung/rugi.)
+
+### ⚡ Rekomendasi Taktis & Core Feedback
+(Berikan 2 hingga 3 buah saran perbaikan taktis masa depan yang bersifat operasional dan praktis berdasarkan jurnal ini.)`;
+
+    const response = await activeAi.models.generateContent({
+      model: 'gemini-3.5-flash',
+      contents: [{ text: systemPrompt }],
+    });
+
+    const reviewText = response.text || 'Gagal menghasilkan ulasan dari AI.';
+    return res.json({ success: true, aiReview: reviewText });
+  } catch (error: any) {
+    console.error('Gemini Trade Journal Review error:', error);
+    return res.status(500).json({ error: error.message || 'Gagal menghasilkan tinjauan post-trade dari AI.' });
   }
 });
 

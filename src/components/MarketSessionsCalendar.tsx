@@ -163,6 +163,11 @@ export default function MarketSessionsCalendar({ onInjectContext }: MarketSessio
 
   // Helper to check if a specific UTC hour range matches current time
   const isSessionCurrentlyActive = (session: Session): boolean => {
+    const day = currentTime.getDay();
+    if (day === 0 || day === 6) {
+      return false; // Markets closed on Saturday and Sunday
+    }
+
     const currentUtcHour = currentTime.getUTCHours();
     const currentUtcMin = currentTime.getUTCMinutes();
     const totalCurrentUtcMinutes = currentUtcHour * 60 + currentUtcMin;
@@ -180,6 +185,16 @@ export default function MarketSessionsCalendar({ onInjectContext }: MarketSessio
 
   // Helper to calculate countdown time to a session open or close
   const getSessionTimeLeft = (session: Session): { label: string; active: boolean } => {
+    const day = currentTime.getDay();
+    const isWeekendNow = day === 0 || day === 6;
+
+    if (isWeekendNow) {
+      return {
+        label: 'TUTUP (LIBUR AKHIR PEKAN)',
+        active: false
+      };
+    }
+
     const active = isSessionCurrentlyActive(session);
     const currentUtcHour = currentTime.getUTCHours();
     const currentUtcMin = currentTime.getUTCMinutes();
@@ -244,6 +259,32 @@ export default function MarketSessionsCalendar({ onInjectContext }: MarketSessio
             <p className="text-xs text-slate-400 mt-1">
               Panduan waktu pasar terbaik, tumpang tindih sesi (overlapping), serta rilis berita kritikal yang menggerakkan volatilitas valas, kripto, dan saham IDX.
             </p>
+            
+            {/* Weekend Closed Status Info */}
+            {(() => {
+              const day = currentTime.getDay();
+              const isWeekendNow = day === 0 || day === 6;
+              return (
+                <div className={`mt-4 p-3.5 rounded-lg border flex items-start space-x-3 font-mono text-[11px] leading-relaxed max-w-2xl ${
+                  isWeekendNow 
+                    ? 'bg-rose-950/40 border-rose-500/25 text-rose-350'
+                    : 'bg-slate-950/45 border-slate-800 text-slate-450'
+                }`}>
+                  <AlertTriangle className={`shrink-0 mt-0.5 ${isWeekendNow ? 'text-rose-400 animate-pulse' : 'text-slate-500'}`} size={14} />
+                  <div>
+                    <span className="font-extrabold block uppercase tracking-wider text-slate-300">
+                      STATUS JADWAL AKHIR PEKAN (SABTU & MINGGU)
+                    </span>
+                    <span className="block mt-1">
+                      • <b className="text-slate-200">Pasar Forex & Saham IDX:</b> <span className={`font-black uppercase ${isWeekendNow ? 'text-rose-450 text-rose-400' : 'text-slate-400'}`}>🔐 TUTUP (CLOSED)</span> secara internasional selama akhir pekan penuh.
+                    </span>
+                    <span className="block">
+                      • <b className="text-slate-200">Pasar Cryptocurrency:</b> <span className="text-emerald-400 font-extrabold uppercase">🔓 BUKA (AKTIF 24/7)</span> tanpa libur sepanjang tahun.
+                    </span>
+                  </div>
+                </div>
+              );
+            })()}
           </div>
 
           {/* Timezone Switcher */}

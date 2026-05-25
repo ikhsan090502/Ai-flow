@@ -66,3 +66,19 @@ export interface SignalHistoryStats {
   buyCount: number;
   sellCount: number;
 }
+
+export interface TradeJournalEntry {
+  id: string;
+  pair: string;
+  type: 'BUY' | 'SELL';
+  entryPrice: number;
+  exitPrice?: number;
+  status: 'OPEN' | 'CLOSED';
+  entryReason: string;
+  exitReason?: string;
+  pnl?: number;
+  notes?: string;
+  aiReview?: string;
+  createdAt: number;
+}
+

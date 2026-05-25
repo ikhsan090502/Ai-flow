@@ -8,6 +8,18 @@
           const originalGlobalThis = window.globalThis || window;
           const originalFetch = window.fetch;
           
+          // Redefine window.fetch as fully writable and configurable to satisfy external interceptors/setters
+          try {
+            Object.defineProperty(window, 'fetch', {
+              value: originalFetch,
+              writable: true,
+              configurable: true,
+              enumerable: true
+            });
+          } catch (e) {
+            console.warn('Failed to define fetch directly on window:', e);
+          }
+
           let proxy;
           const proxyHandler = {
             get(target, prop) {

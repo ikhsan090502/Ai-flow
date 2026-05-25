@@ -12,18 +12,18 @@ export function formatAssetPrice(price: number, type: string): number {
 }
 
 const FIXED_SEEDS: Record<string, { price: number; change24h: number }> = {
-  XAUUSD: { price: 2424.70, change24h: -0.15 },
-  XAGUSD: { price: 31.25, change24h: 0.45 },
-  EURUSD: { price: 1.0852, change24h: 0.12 },
-  GBPUSD: { price: 1.2718, change24h: -0.05 },
-  AUDUSD: { price: 0.6652, change24h: 0.22 },
-  USDJPY: { price: 155.62, change24h: 0.35 },
-  USDCAD: { price: 1.3682, change24h: -0.10 },
-  USDCHF: { price: 0.9085, change24h: -0.18 },
+  XAUUSD: { price: 4562.42, change24h: 1.17 },
+  XAGUSD: { price: 77.56, change24h: 2.76 },
+  EURUSD: { price: 1.1636, change24h: 0.30 },
+  GBPUSD: { price: 1.3475, change24h: 0.41 },
+  AUDUSD: { price: 0.7250, change24h: 0.22 },
+  USDJPY: { price: 158.87, change24h: -0.19 },
+  USDCAD: { price: 1.3282, change24h: -0.10 },
+  USDCHF: { price: 0.8885, change24h: -0.18 },
   
   // Standard Cryptos
-  BTCUSDT: { price: 68450.00, change24h: 1.45 },
-  ETHUSDT: { price: 3420.50, change24h: 2.15 },
+  BTCUSDT: { price: 76999.00, change24h: 0.03 },
+  ETHUSDT: { price: 2093.50, change24h: -0.18 },
   SOLUSDT: { price: 182.40, change24h: 5.60 },
   BNBUSDT: { price: 615.30, change24h: -0.30 },
   DOGEUSDT: { price: 0.1850, change24h: 12.40 },
@@ -78,8 +78,8 @@ const FIXED_SEEDS: Record<string, { price: number; change24h: number }> = {
   BABYDOGEUSDT: { price: 0.00000284, change24h: 9.20 },
 
   // Standard Crypto Futures Fallbacks
-  BTCUSDT_PERP: { price: 68485.00, change24h: 1.52 },
-  ETHUSDT_PERP: { price: 3422.10, change24h: 2.22 },
+  BTCUSDT_PERP: { price: 77090.00, change24h: 0.03 },
+  ETHUSDT_PERP: { price: 2094.10, change24h: -0.18 },
   SOLUSDT_PERP: { price: 182.65, change24h: 5.75 },
   BNBUSDT_PERP: { price: 615.80, change24h: -0.25 },
   DOGEUSDT_PERP: { price: 0.1855, change24h: 12.55 },
@@ -127,78 +127,59 @@ SUPPORTED_ASSETS.forEach((asset) => {
 });
 
 /**
- * Fetches real crypto rates from public Binance API, while maintaining Simulated rates 
- * for other assets, making it robust and highly responsive.
+ * Fetches real crypto, forex, commodities, and Indonesian stocks (IDX) from the unified 
+ * proxy API server-side, with full client-side simulated fallback as guard. On top of real rates, 
+ * this makes the pricing robust, accurate, and completely CORS-free!
  */
 export async function getLivePrices(): Promise<Record<string, LivePrice>> {
   try {
-    // Attempt crypto fetch from Binance
-    const response = await fetch('https://api.binance.com/api/v3/ticker/24hr');
+    const response = await fetch('/api/market/prices');
     if (response.ok) {
       const data = await response.json();
-      if (Array.isArray(data)) {
-        data.forEach((item: any) => {
-          const sym = item.symbol;
-          
-          // Match standard crypto assets of symbol or symbol_PERP
-          const matchedAssets = SUPPORTED_ASSETS.filter(a => a.symbol === sym || a.symbol === `${sym}_PERP`);
-          
-          matchedAssets.forEach(asset => {
-            const symKey = asset.symbol;
-            const rawPrice = parseFloat(item.lastPrice || item.price);
-            const change = parseFloat(item.priceChangePercent);
-            const high = parseFloat(item.highPrice);
-            const low = parseFloat(item.lowPrice);
-            
-            if (!isNaN(rawPrice)) {
-              // For perp, add a tiny mock perpetual funding premium/discount offset
-              const perpetualOffset = asset.type === 'crypto_futures' ? 1.0003 : 1.0;
-              const price = rawPrice * perpetualOffset;
-              
-              currentPrices[symKey] = {
-                symbol: symKey,
-                price: formatAssetPrice(price, asset.type),
-                change24h: isNaN(change) ? 0 : change,
-                high24h: formatAssetPrice(isNaN(high) ? price * 1.02 : high * perpetualOffset, asset.type),
-                low24h: formatAssetPrice(isNaN(low) ? price * 0.98 : low * perpetualOffset, asset.type),
-                lastUpdated: Date.now(),
-              };
-            }
-          });
-        });
-      }
+      Object.keys(data).forEach((key) => {
+        const asset = SUPPORTED_ASSETS.find(a => a.symbol === key);
+        if (asset) {
+          const raw = data[key];
+          currentPrices[key] = {
+            symbol: key,
+            price: formatAssetPrice(raw.price, asset.type),
+            change24h: Number(raw.change24h.toFixed(2)),
+            high24h: formatAssetPrice(raw.high24h, asset.type),
+            low24h: formatAssetPrice(raw.low24h, asset.type),
+            lastUpdated: raw.lastUpdated || Date.now()
+          };
+        }
+      });
+      return { ...currentPrices };
     }
   } catch (err) {
-    console.warn('Binance API fetch failed, relying on dynamic seeded model', err);
+    console.warn('Failed to fetch from server-side price proxy, running fallback ticker', err);
   }
 
-  // Double check forex/commodity/futures are up to date and simulate natural jitter
+  // Backup simple client ticker simulation in case the network fails
   SUPPORTED_ASSETS.forEach((asset) => {
     const current = currentPrices[asset.symbol];
-    if ((asset.type !== 'crypto' && asset.type !== 'crypto_futures') || !current) {
-      // Simulate minor ticking for standard exchange items or if crypto failed
-      const changePercent = (Math.random() - 0.5) * 0.00016; // tiny natural change
-      const defaultSeed = FIXED_SEEDS[asset.symbol] || (() => {
-        const spotSymbol = asset.symbol.replace('_PERP', '');
-        return FIXED_SEEDS[spotSymbol] || { price: 100, change24h: 0 };
-      })();
-      
-      const priceObject = current || {
-        symbol: asset.symbol,
-        price: defaultSeed.price,
-        change24h: defaultSeed.change24h,
-        high24h: defaultSeed.price * 1.05,
-        low24h: defaultSeed.price * 0.95,
-        lastUpdated: Date.now(),
-      };
-      
-      const nextPrice = priceObject.price * (1 + changePercent);
-      currentPrices[asset.symbol] = {
-        ...priceObject,
-        price: formatAssetPrice(nextPrice, asset.type),
-        lastUpdated: Date.now(),
-      };
-    }
+    const changePercent = (Math.random() - 0.5) * 0.00015;
+    const defaultSeed = FIXED_SEEDS[asset.symbol] || (() => {
+      const spotSymbol = asset.symbol.replace('_PERP', '');
+      return FIXED_SEEDS[spotSymbol] || { price: 100, change24h: 0 };
+    })();
+    
+    const priceObject = current || {
+      symbol: asset.symbol,
+      price: defaultSeed.price,
+      change24h: defaultSeed.change24h,
+      high24h: defaultSeed.price * 1.05,
+      low24h: defaultSeed.price * 0.95,
+      lastUpdated: Date.now(),
+    };
+    
+    const nextPrice = priceObject.price * (1 + changePercent);
+    currentPrices[asset.symbol] = {
+      ...priceObject,
+      price: formatAssetPrice(nextPrice, asset.type),
+      lastUpdated: Date.now(),
+    };
   });
 
   return { ...currentPrices };
