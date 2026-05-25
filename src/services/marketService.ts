@@ -153,10 +153,115 @@ export async function getLivePrices(): Promise<Record<string, LivePrice>> {
       return { ...currentPrices };
     }
   } catch (err) {
-    console.warn('Failed to fetch from server-side price proxy, running fallback ticker', err);
+    console.warn('Server-side price proxy not available. Initiating direct keyless public API fallbacks...', err);
   }
 
-  // Backup simple client ticker simulation in case the network fails
+  // Backup premium browser-direct API fetcher for static deployments (Github Pages etc.)
+  try {
+    // 1. Fetch Spot Gold / Silver from Gold-API
+    const goldPromise = fetch('https://api.gold-api.com/api/XAU/USD')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+    const silverPromise = fetch('https://api.gold-api.com/api/XAG/USD')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+
+    // 2. Fetch Forex from ExchangeRate-API (keyless, client-CORS friendly)
+    const forexPromise = fetch('https://open.er-api.com/v6/latest/USD')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+
+    // 3. Fetch Crypto immediately from Binance (wildcard browser CORS friendly!)
+    const cryptoPromise = fetch('https://api.binance.com/api/v3/ticker/24hr')
+      .then(r => r.ok ? r.json() : null)
+      .catch(() => null);
+
+    const [goldData, silverData, forexData, cryptoData] = await Promise.all([
+      goldPromise,
+      silverPromise,
+      forexPromise,
+      cryptoPromise
+    ]);
+
+    // Apply Gold
+    if (goldData && typeof goldData.price === 'number') {
+      const xau = currentPrices['XAUUSD'];
+      currentPrices['XAUUSD'] = {
+        symbol: 'XAUUSD',
+        price: goldData.price,
+        change24h: xau ? xau.change24h : 1.17,
+        high24h: formatAssetPrice(goldData.price * 1.015, 'commodity'),
+        low24h: formatAssetPrice(goldData.price * 0.985, 'commodity'),
+        lastUpdated: Date.now()
+      };
+    }
+
+    // Apply Silver
+    if (silverData && typeof silverData.price === 'number') {
+      const xag = currentPrices['XAGUSD'];
+      currentPrices['XAGUSD'] = {
+        symbol: 'XAGUSD',
+        price: silverData.price,
+        change24h: xag ? xag.change24h : 2.76,
+        high24h: formatAssetPrice(silverData.price * 1.025, 'commodity'),
+        low24h: formatAssetPrice(silverData.price * 0.975, 'commodity'),
+        lastUpdated: Date.now()
+      };
+    }
+
+    // Apply Forex
+    if (forexData && forexData.rates) {
+      const rates = forexData.rates;
+      const forexMapping: Record<string, number> = {
+        EURUSD: rates.EUR ? 1 / rates.EUR : 1.1636,
+        GBPUSD: rates.GBP ? 1 / rates.GBP : 1.3475,
+        AUDUSD: rates.AUD ? 1 / rates.AUD : 0.7250,
+        USDJPY: rates.JPY || 158.87,
+        USDCAD: rates.CAD || 1.3282,
+        USDCHF: rates.CHF || 0.8885,
+      };
+
+      Object.entries(forexMapping).forEach(([sym, rate]) => {
+        const existing = currentPrices[sym];
+        currentPrices[sym] = {
+          symbol: sym,
+          price: formatAssetPrice(rate, 'forex'),
+          change24h: existing ? existing.change24h : 0.1,
+          high24h: formatAssetPrice(rate * 1.008, 'forex'),
+          low24h: formatAssetPrice(rate * 0.992, 'forex'),
+          lastUpdated: Date.now()
+        };
+      });
+    }
+
+    // Apply Crypto Spot / Perpetuals
+    if (Array.isArray(cryptoData)) {
+      cryptoData.forEach((item: any) => {
+        const sym = item.symbol;
+        const matchedAssets = SUPPORTED_ASSETS.filter(a => a.symbol === sym || a.symbol === `${sym}_PERP`);
+        matchedAssets.forEach(asset => {
+          const rawPrice = parseFloat(item.lastPrice || item.price);
+          const change = parseFloat(item.priceChangePercent);
+          if (!isNaN(rawPrice)) {
+            const perpetualOffset = asset.type === 'crypto_futures' ? 1.0003 : 1.0;
+            const finalPrice = rawPrice * perpetualOffset;
+            currentPrices[asset.symbol] = {
+              symbol: asset.symbol,
+              price: formatAssetPrice(finalPrice, asset.type),
+              change24h: isNaN(change) ? 0.0 : change,
+              high24h: formatAssetPrice(parseFloat(item.highPrice || (finalPrice * 1.05)), asset.type),
+              low24h: formatAssetPrice(parseFloat(item.lowPrice || (finalPrice * 0.95)), asset.type),
+              lastUpdated: Date.now()
+            };
+          }
+        });
+      });
+    }
+  } catch (directApiErr) {
+    console.warn('Fallback direct API fetchers also failed, generating client-side simulations:', directApiErr);
+  }
+
+  // Final tier: simulated live price drift simulation as a standard robust fallback for any missing asset rates
   SUPPORTED_ASSETS.forEach((asset) => {
     const current = currentPrices[asset.symbol];
     const changePercent = (Math.random() - 0.5) * 0.00015;
@@ -174,6 +279,7 @@ export async function getLivePrices(): Promise<Record<string, LivePrice>> {
       lastUpdated: Date.now(),
     };
     
+    // Smooth the update with natural ticks
     const nextPrice = priceObject.price * (1 + changePercent);
     currentPrices[asset.symbol] = {
       ...priceObject,
