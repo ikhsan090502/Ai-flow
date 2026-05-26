@@ -420,7 +420,7 @@ let signalsHistory: ServerSignal[] = [
 
 // POST Analyze with Gemini API
 app.post('/api/analyze', async (req, res) => {
-  const { pair, currentPrice, timeframe, indicators, customPrompt, tradingStyle, pastAnalyses } = req.body;
+  const { pair, currentPrice, timeframe, indicators, customPrompt, tradingStyle, pastAnalyses, compiledMetrics } = req.body;
 
   if (!pair || !currentPrice) {
     return res.status(400).json({ error: 'Pair and currentPrice are required' });
@@ -439,9 +439,39 @@ app.post('/api/analyze', async (req, res) => {
       }).join('\n')
     : 'Belum ada riwayat analisis terekam. Ini adalah analisis sirkuit awal Anda.';
 
+  // Format the compiled real-time metrics context
+  let compiledMetricsContext = '';
+  if (compiledMetrics) {
+    const { technicals, sentiment: compSentiment, fundamentals } = compiledMetrics;
+    compiledMetricsContext = `
+========================================================================
+ALIRAN DATA AGREGATOR UTAMA (REAL-TIME ENGINE READINGS):
+- Pasangan Aset: ${pair}
+- Harga Saat Ini: ${currentPrice}
+- Timeframe Analitik: ${timeframe}
+
+1. METRIK TEKNIKAL LIVE (CHART UTAMA & INDIKATOR):
+- RSI (Relative Strength Index): ${technicals?.rsi || 'N/A'} [Status: ${technicals?.rsiStatus || 'NEUTRAL'}]
+- MACD Line: ${technicals?.macdLine?.toFixed(4) || 'N/A'} | Signal Line: ${technicals?.signalLine?.toFixed(4) || 'N/A'} | Histogram: ${technicals?.macdHistogram?.toFixed(4) || 'N/A'} [Status: ${technicals?.macdStatus || 'NEUTRAL'}]
+- EMA-50 (Eksponensial): ${technicals?.ema50?.toFixed(2) || 'N/A'} | EMA-200 (Eksponensial): ${technicals?.ema200?.toFixed(2) || 'N/A'} [Kondisi Tren: ${technicals?.trendState || 'CONSOLIDATING'}]
+- Bollinger Bands: Atas: ${technicals?.bollingerUpper?.toFixed(2) || 'N/A'} | Tengah: ${technicals?.bollingerMiddle?.toFixed(2) || 'N/A'} | Bawah: ${technicals?.bollingerLower?.toFixed(2) || 'N/A'}
+- Pivot Sembunyi & Level Kunci: R2: ${technicals?.pivotPoints?.r2?.toFixed(2) || 'N/A'} | R1: ${technicals?.pivotPoints?.r1?.toFixed(2) || 'N/A'} | Pivot: ${technicals?.pivotPoints?.pivot?.toFixed(2) || 'N/A'} | S1: ${technicals?.pivotPoints?.s1?.toFixed(2) || 'N/A'} | S2: ${technicals?.pivotPoints?.s2?.toFixed(2) || 'N/A'}
+
+2. METRIK SENTIMEN PASAR:
+- Indeks Fear & Greed: ${compSentiment?.fearGreedIndex || 'N/A'} [Status: ${compSentiment?.fearGreedLabel || 'NEUTRAL'}]
+- Pembagian Arah Trader: ${compSentiment?.bullishPercentage || 50}% Bullish | ${compSentiment?.bearishPercentage || 50}% Bearish
+- Rasio Penjatahan Buku Order (Orderbook Bid/Ask Ratio): ${compSentiment?.orderBookRatio || '1.0'}x (Kelebihan Bid dibanding Ask)
+- Kecepatan Pembicaraan Sosial (Social Volume Velocity): ${compSentiment?.socialVolumePercent || 'N/A'}%
+
+3. FAKTOR & METRIK REKOMENDASI FUNDAMENTAL AKTIF:
+${Array.isArray(fundamentals) ? fundamentals.map((f: any) => `- ${f.label}: ${f.value} [Sentimen Efek: ${f.bias.toUpperCase()}]`).join('\n') : '- Tidak ada parameter fundamental khusus terdeteksi untuk aset ini.'}
+========================================================================
+    `.trim();
+  }
+
   // Build high impact prompt
   const systemPrompt = `Kamu adalah FuturesMax AI, sebuah sistem AI analis profesional elit di pasar Crypto, Forex, Komoditas, dan Saham Indonesia (IDX) yang dilengkapi dengan "Continuous Learning Cognitive Circuitry" (Sistem Memori Pembelajaran Berkelanjutan).
-Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan parameter input dan memberikan rekomendasi serta sinyal perdagangan (Signal Entry) yang akurat dan kredibel.
+Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan parameter input, data live pasar teragregasi yang kami sediakan, dan memberikan rekomendasi serta sinyal perdagangan (Signal Entry) yang akurat dan kredibel.
 
 Jika aset adalah Saham Indonesia (misal: BBCA, BBRI, TLKM, GOTO, BMRI, ASII), analisislah dengan dinamika khas pasar saham domestik Indonesia (IHSG / BEI) dan pastikan memberikan harga entryPrice, takeProfit1, takeProfit2, dan stopLoss dalam bentuk angka bulat Rupiah (integer tanpa decimal sepeser pun).
 Jika indikator opsional mengandung 'Momentum Pembalikan', fokuskan analisis pada penemuan pola-pola pembalikan tren (reversal momentum) seperti bullish/bearish divergence, overbought/oversold exhaustion, double bottom/top, head and shoulders, atau harmonic patterns, serta konfirmasi kegagalan breakout (liquidity sweep).
@@ -449,6 +479,9 @@ Jika indikator opsional mengandung 'Momentum Pembalikan', fokuskan analisis pada
 RIWAYAT ANALISIS TERDAHULU UNTUK PEMBELAJARAN (COGNITIVE MEMORY LOG):
 Gunakan riwayat di bawah ini untuk belajar dari keputusan masa lalu Anda sendiri. Pelajari pola-polanya agar keputusan sekarang memiliki sinergi akumulatif, lebih konsisten, dan menghindari pengulangan bias analisa yang tidak akurat:
 ${historyContext}
+
+${compiledMetrics ? `DATA AGREGATOR LIVE PASAR UNTUK REKTIFIKASI (WAJIB DIBACA DAN DIALIRKAN DALAM ANALISISMU):
+${compiledMetricsContext}` : ''}
 
 REKAYASA SINYAL SESUAI GAYA TRADING:
 - Tentukan jenis aksi trading: 'BUY', 'SELL', atau 'NEUTRAL'.
@@ -458,10 +491,10 @@ REKAYASA SINYAL SESUAI GAYA TRADING:
 - Atur tingkat kepercayaan 'confidence': dapat berkisar antara 'HIGH', 'MEDIUM', atau 'LOW'.
 
 STRUKTUR ANALISIS (Tulis semua penjelasan dalam Bahasa Indonesia yang profesional, tegas, dan berbobot tanpa istilah main-main):
-- 'sentiment': Jelaskan dinamika pelaku pasar dengan detail, psikologi pembeli/penjual di area harga sekarang sesuai gaya trading "${tradingStyle || 'bebas'}", dan korelasi volume transaksi.
-- 'mtfAnalysis': Jelaskan analisis multi-timeframe komprehensif sesuai durasi investasi, menghubungkan kerangka waktu besar (HTF) dan kerangka waktu kecil (LTF).
-- 'bullishCase': Argumen teknikal dan alasan utama mengapa harga berpeluang naik (misal: support kokoh, fibonacci, indikator jenuh jual, pola harmonis).
-- 'bearishCase': Argumen teknikal dan alasan utama mengapa harga berpeluang turun (misal: jenuh beli, resistensi tangguh, supply zone, orderblock bearish).
+- 'sentiment': Jelaskan dinamika pelaku pasar dengan detail, psikologi pembeli/penjual di area harga sekarang sesuai gaya trading "${tradingStyle || 'bebas'}" dan data sentimen pasar di atas, serta korelasi volume transaksi.
+- 'mtfAnalysis': Jelaskan analisis multi-timeframe komprehensif sesuai durasi investasi, menghubungkan kerangka waktu besar (HTF) dan kerangka waktu kecil (LTF), serta integrasikan pembacaan EMA, MACD, dan Pivot dari data live pasar jika tersedia.
+- 'bullishCase': Argumen teknikal & fundamental kuat mengapa harga berpeluang naik (sisipkan data RSI, Bollinger Bands, FVG, atau Fundamental rasio dari data agregator jika relevan).
+- 'bearishCase': Argumen teknikal & fundamental kuat mengapa harga berpeluang turun (sisipkan resistensi tangguh, data fear/greed, sirkulasi global, atau fundamental negatif dari agregator jika relevan).
 - 'learningFeedback': Berikan 1-2 kalimat analisis kritis/metakognitif tentang apa yang kamu pelajari dari riwayat masa lalu (jika ada) atau bagaimana sirkuit analisismu disempurnakan berdasarkan gaya trading "${tradingStyle || 'bebas'}" dan parameter instrumen ${pair} (misal: "Berdasarkan memori transaksi volatilitas tinggi di masa lalu, kami menyerap parameter baru untuk mengoptimalkan keandalan take profit pada ${pair}" atau "Mempelajari sirkuit historis, kami memperketat stop loss M15 guna mencegah slippage spread").
 
 PERHATIKAN HARGA YANG DIIKUTI:

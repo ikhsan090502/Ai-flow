@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Asset, MarketSignal, TelegramConfig, LivePrice, PriceAlert } from './types';
 import PriceFeed from './components/PriceFeed';
 import PriceAlertsPanel from './components/PriceAlertsPanel';
@@ -283,6 +283,9 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
     setSignals(prev => [newSignal, ...prev]);
   };
 
+  // Track resolving signals to avoid duplicates
+  const resolvingSignalsRef = useRef<Record<string, boolean>>({});
+
   // Explicitly update signal status to TP or SL on the server for full transparency of performance tracking
   const handleResolveSignal = async (id: string, status: 'TAKE_PROFIT' | 'STOP_LOSS' | 'EXPIRED', pips: number, currentPrice?: number) => {
     try {
@@ -299,6 +302,68 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
       console.error('Failed to resolve signal status on Backend:', err);
     }
   };
+
+  // Real-time monitor: automatically check if any active trader signals hit TP & SL limits
+  useEffect(() => {
+    if (signals.length === 0 || Object.keys(prices).length === 0) return;
+
+    signals.forEach(async (sig) => {
+      if (sig.status !== 'ACTIVE') return;
+      if (resolvingSignalsRef.current[sig.id]) return;
+
+      const live = prices[sig.pair.toUpperCase()];
+      if (!live) return;
+
+      const currentPrice = live.price;
+      let triggered = false;
+      let status: 'TAKE_PROFIT' | 'STOP_LOSS' | null = null;
+
+      if (sig.type === 'BUY') {
+        if (currentPrice >= sig.takeProfit1) {
+          triggered = true;
+          status = 'TAKE_PROFIT';
+        } else if (currentPrice <= sig.stopLoss) {
+          triggered = true;
+          status = 'STOP_LOSS';
+        }
+      } else if (sig.type === 'SELL') {
+        if (currentPrice <= sig.takeProfit1) {
+          triggered = true;
+          status = 'TAKE_PROFIT';
+        } else if (currentPrice >= sig.stopLoss) {
+          triggered = true;
+          status = 'STOP_LOSS';
+        }
+      }
+
+      if (triggered && status) {
+        resolvingSignalsRef.current[sig.id] = true;
+
+        const isCrypto = sig.pair.toUpperCase().includes('USDT');
+        const isStock = ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO', 'BMRI'].some(s => sig.pair.toUpperCase().startsWith(s));
+        const multiplier = isStock ? 1 : (isCrypto ? 100 : (sig.pair.toUpperCase().includes('JPY') ? 100 : 10000));
+        
+        let pips = 0;
+        if (status === 'TAKE_PROFIT') {
+          pips = sig.type === 'BUY'
+            ? Math.round((sig.takeProfit1 - sig.entryPrice) * multiplier)
+            : Math.round((sig.entryPrice - sig.takeProfit1) * multiplier);
+        } else {
+          pips = sig.type === 'BUY'
+            ? Math.round((sig.stopLoss - sig.entryPrice) * multiplier)
+            : Math.round((sig.entryPrice - sig.stopLoss) * multiplier);
+        }
+
+        console.log(`Auto-resolving signal ${sig.id} (${sig.pair}) to ${status} with pips: ${pips}`);
+        await handleResolveSignal(sig.id, status, pips, currentPrice);
+        
+        // Remove tracking item after a short safety timeout to let state settle
+        setTimeout(() => {
+          delete resolvingSignalsRef.current[sig.id];
+        }, 3000);
+      }
+    });
+  }, [prices, signals]);
 
   // Trigger click auto-fill binding from the Live Feed grid
   const handleSelectAsset = (asset: Asset, currentPrice: number) => {
@@ -473,6 +538,7 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
               telegramConfig={telegramConfig}
               onSignalGenerated={handleNewSignalCreated}
               injectedNews={injectedNewsContext}
+              prices={prices}
             />
           )}
 

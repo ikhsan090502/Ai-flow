@@ -1,10 +1,12 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, MarketSignal, TelegramConfig } from '../types';
+import { LivePrice, Asset, MarketSignal, TelegramConfig } from '../types';
 import { motion, AnimatePresence } from 'motion/react';
 import { 
   TrendingUp, TrendingDown, RefreshCw, Send, CheckSquare, 
-  HelpCircle, AlertTriangle, ShieldCheck, Cpu, ChevronRight, CheckCircle2 
+  HelpCircle, AlertTriangle, ShieldCheck, Cpu, ChevronRight, CheckCircle2,
+  Gauge, Activity, Globe, Info
 } from 'lucide-react';
+import { compileMarketData } from '../utils/marketDataCompiler';
 
 interface TechnicalAnalyzerProps {
   selectedAsset: Asset | null;
@@ -12,11 +14,13 @@ interface TechnicalAnalyzerProps {
   telegramConfig: TelegramConfig;
   onSignalGenerated: (newSignal: MarketSignal) => void;
   injectedNews?: string;
+  prices: Record<string, LivePrice>;
 }
 
-export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegramConfig, onSignalGenerated, injectedNews }: TechnicalAnalyzerProps) {
+export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegramConfig, onSignalGenerated, injectedNews, prices }: TechnicalAnalyzerProps) {
   const [pair, setPair] = useState('');
   const [currentPrice, setCurrentPrice] = useState('');
+  const [isAutoTrack, setIsAutoTrack] = useState(true);
   const [timeframe, setTimeframe] = useState('M15');
   const [tradingStyle, setTradingStyle] = useState<'SCALP' | 'DAY TRADE' | 'SWING' | 'POSITION'>('SCALP');
   const [customPrompt, setCustomPrompt] = useState('');
@@ -48,6 +52,23 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
   const [leverage, setLeverage] = useState(20);
   const [isLong, setIsLong] = useState(true);
 
+  // Live aggregated compiled metrics for UI gauges & feeding Gemini API
+  const [liveMetrics, setLiveMetrics] = useState<any>(null);
+
+  useEffect(() => {
+    const pVal = parseFloat(currentPrice);
+    if (pair && !isNaN(pVal) && pVal > 0) {
+      try {
+        const compiled = compileMarketData(pair.toUpperCase(), pVal);
+        setLiveMetrics(compiled);
+      } catch (err) {
+        console.error('Error compiling metrics:', err);
+      }
+    } else {
+      setLiveMetrics(null);
+    }
+  }, [pair, currentPrice]);
+
   // Sync injectedNews changes
   useEffect(() => {
     if (injectedNews) {
@@ -62,6 +83,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
   useEffect(() => {
     if (selectedAsset) {
       setPair(selectedAsset.symbol);
+      setIsAutoTrack(true);
     }
   }, [selectedAsset]);
 
@@ -71,6 +93,16 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
       setCurrentPrice(selectedPrice.toString());
     }
   }, [selectedPrice]);
+
+  // Auto-sync price ticks when isAutoTrack is enabled
+  useEffect(() => {
+    if (isAutoTrack && pair) {
+      const match = prices[pair.toUpperCase().trim()];
+      if (match) {
+        setCurrentPrice(match.price.toString());
+      }
+    }
+  }, [prices, pair, isAutoTrack]);
 
   const toggleIndicator = (name: string) => {
     setIndicators(prev => 
@@ -107,6 +139,8 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
         sentiment: h.sentiment
       }));
 
+      const compiledMetricsVal = compileMarketData(pair.toUpperCase(), parseFloat(currentPrice));
+
       const response = await fetch('/api/analyze', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -117,7 +151,8 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
           tradingStyle,
           indicators,
           customPrompt,
-          pastAnalyses: pastAnalysesPayload
+          pastAnalyses: pastAnalysesPayload,
+          compiledMetrics: compiledMetricsVal
         }),
       });
 
@@ -209,12 +244,35 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
             </div>
 
             <div>
-              <label className="block text-xs font-mono text-slate-400 uppercase mb-2">Harga Sekarang</label>
+              <div className="flex justify-between items-center mb-2">
+                <label className="text-xs font-mono text-slate-400 uppercase">Harga Sekarang</label>
+                <button
+                  type="button"
+                  onClick={() => setIsAutoTrack(prev => !prev)}
+                  className={`flex items-center space-x-1.5 px-1.5 py-0.5 rounded text-[8.5px] font-mono whitespace-nowrap select-none transition ${
+                    isAutoTrack 
+                      ? 'bg-emerald-950/70 text-emerald-400 border border-emerald-800' 
+                      : 'bg-slate-950 text-slate-500 border border-slate-800 hover:text-slate-300'
+                  }`}
+                  title={isAutoTrack ? "Klik untuk mematikan sinkronisasi harga live" : "Klik untuk menyalakan sinkronisasi harga live"}
+                >
+                  {isAutoTrack && (
+                    <span className="relative flex h-1.5 w-1.5">
+                      <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                      <span className="relative inline-flex rounded-full h-1.5 w-1.5 bg-emerald-500"></span>
+                    </span>
+                  )}
+                  <span>{isAutoTrack ? 'LIVE AUTOPILOT' : 'KONTROL MANUAL'}</span>
+                </button>
+              </div>
               <input
                 type="text"
                 placeholder="Harga asset live"
                 value={currentPrice}
-                onChange={(e) => setCurrentPrice(e.target.value)}
+                onChange={(e) => {
+                  setCurrentPrice(e.target.value);
+                  setIsAutoTrack(false);
+                }}
                 className="w-full bg-slate-950 border border-slate-800 rounded-lg px-4 py-2.5 text-sm text-white focus:outline-none focus:border-slate-600 transition font-mono font-bold"
               />
             </div>
@@ -272,6 +330,136 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               })}
             </div>
           </div>
+
+          {/* Live Aggregator Market Readings Panel */}
+          {liveMetrics && (
+            <div className="bg-slate-950 p-4 rounded-xl border border-slate-800/80 space-y-4">
+              <div className="flex items-center space-x-2 pb-2.5 border-b border-slate-900">
+                <Gauge className="text-emerald-400 animate-pulse animate-duration-3000" size={16} />
+                <div>
+                  <h4 className="text-xs font-mono font-bold text-white tracking-widest uppercase flex items-center space-x-1.5">
+                    <span>LIVE MARKET AGGREGATOR READINGS</span>
+                    <span className="text-[9px] bg-emerald-950 text-emerald-400 px-1.5 py-0.5 rounded border border-emerald-900 animate-pulse font-normal">STREAMED</span>
+                  </h4>
+                  <p className="text-[9px] text-slate-500 font-mono uppercase mt-0.5">Metrik ini diumpankan secara presisi ke sirkuit kognitif AI saat analisis dijalankan</p>
+                </div>
+              </div>
+
+              <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+                {/* Column 1: Technical indicators */}
+                <div className="bg-slate-900/40 border border-slate-900 rounded-lg p-3 space-y-3.5">
+                  <div className="flex justify-between items-center text-[10px] font-mono border-b border-slate-900 pb-1.5">
+                    <span className="text-slate-400 font-bold uppercase">📉 METRIK TEKNIKAL</span>
+                    <span className={`px-1.5 py-0.5 text-[8px] rounded font-black ${
+                      liveMetrics.technicals.trendState.includes('UPTREND') 
+                        ? 'bg-emerald-950 text-emerald-400' 
+                        : (liveMetrics.technicals.trendState.includes('DOWNTREND') ? 'bg-rose-950/60 text-rose-400' : 'bg-slate-800 text-slate-400')
+                    }`}>{liveMetrics.technicals.trendState.replace('_', ' ')}</span>
+                  </div>
+
+                  <div className="space-y-2 text-xs font-mono">
+                    {/* RSI */}
+                    <div>
+                      <div className="flex justify-between text-[11px] mb-1">
+                        <span className="text-slate-500">RSI ({liveMetrics.technicals.rsi})</span>
+                        <span className={`font-bold ${
+                          liveMetrics.technicals.rsiStatus === 'OVERBOUGHT' ? 'text-amber-500' :
+                          liveMetrics.technicals.rsiStatus === 'BULLISH' ? 'text-emerald-400' :
+                          liveMetrics.technicals.rsiStatus === 'OVERSOLD' ? 'text-amber-500' :
+                          liveMetrics.technicals.rsiStatus === 'BEARISH' ? 'text-rose-400' : 'text-slate-400'
+                        }`}>{liveMetrics.technicals.rsiStatus}</span>
+                      </div>
+                      <div className="w-full bg-slate-950 rounded-full h-1.5 overflow-hidden">
+                        <div 
+                          className={`h-1.5 rounded-full transition-all duration-500 ${
+                            liveMetrics.technicals.rsi >= 70 || liveMetrics.technicals.rsi <= 30 ? 'bg-amber-500' : 'bg-emerald-500'
+                          }`}
+                          style={{ width: `${liveMetrics.technicals.rsi}%` }}
+                        />
+                      </div>
+                    </div>
+
+                    {/* MACD */}
+                    <div className="flex justify-between text-[10px] pt-1">
+                      <span className="text-slate-500">Histogram MACD:</span>
+                      <span className={`font-bold ${liveMetrics.technicals.macdStatus === 'BULLISH' ? 'text-emerald-400' : 'text-rose-400'}`}>
+                        {liveMetrics.technicals.macdHistogram > 0 ? '+' : ''}{liveMetrics.technicals.macdHistogram.toFixed(4)}
+                      </span>
+                    </div>
+
+                    {/* EMA */}
+                    <div className="grid grid-cols-2 gap-1 text-[9px] text-slate-400 bg-slate-950 p-1.5 rounded border border-slate-900">
+                      <div>
+                        <span className="text-slate-600 block">EMA-50:</span>
+                        <span className="text-slate-200 font-bold">{liveMetrics.technicals.ema50.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                      </div>
+                      <div>
+                        <span className="text-slate-600 block">EMA-200:</span>
+                        <span className="text-slate-200 font-bold">{liveMetrics.technicals.ema200.toLocaleString(undefined, { maximumFractionDigits: 2 })}</span>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 2: Sentiment metrics */}
+                <div className="bg-slate-900/40 border border-slate-900 rounded-lg p-3 space-y-3.5">
+                  <div className="flex justify-between items-center text-[10px] font-mono border-b border-slate-900 pb-1.5">
+                    <span className="text-slate-400 font-bold uppercase">🧠 SENTIMEN SENTRA</span>
+                    <span className={`px-1.5 py-0.5 text-[8px] rounded font-black ${
+                      liveMetrics.sentiment.fearGreedLabel.includes('GREED') 
+                        ? 'bg-emerald-950 text-emerald-400' 
+                        : (liveMetrics.sentiment.fearGreedLabel.includes('FEAR') ? 'bg-amber-950 text-amber-500' : 'bg-slate-800 text-slate-400')
+                    }`}>{liveMetrics.sentiment.fearGreedLabel.replace('_', ' ')}</span>
+                  </div>
+
+                  <div className="space-y-2.5 text-xs font-mono">
+                    {/* Fear & Greed Gauge */}
+                    <div className="flex justify-between text-[11px]">
+                      <span className="text-slate-500">Index Fear & Greed:</span>
+                      <span className="font-extrabold text-white">{liveMetrics.sentiment.fearGreedIndex}</span>
+                    </div>
+
+                    {/* Bears vs Bulls bar */}
+                    <div>
+                      <div className="flex justify-between text-[9px] text-slate-500 mb-1">
+                        <span className="text-emerald-400">{liveMetrics.sentiment.bullishPercentage}% Longs</span>
+                        <span className="text-rose-450 text-rose-400">{liveMetrics.sentiment.bearishPercentage}% Shorts</span>
+                      </div>
+                      <div className="w-full bg-rose-950 rounded-full h-1.5 flex overflow-hidden">
+                        <div className="bg-emerald-500 h-1.5 transition-all duration-500" style={{ width: `${liveMetrics.sentiment.bullishPercentage}%` }} />
+                      </div>
+                    </div>
+
+                    {/* Orderbook Ratio */}
+                    <div className="flex justify-between text-[10px]">
+                      <span className="text-slate-500">Rasio Bid/Ask Order:</span>
+                      <span className="font-bold text-slate-300">{liveMetrics.sentiment.orderBookRatio}x</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Column 3: Fundamental indicators */}
+                <div className="bg-slate-900/40 border border-slate-900 rounded-lg p-3 space-y-2">
+                  <div className="flex justify-between items-center text-[10px] font-mono border-b border-slate-900 pb-1.5 mb-1.5">
+                    <span className="text-slate-400 font-bold uppercase">🏢 CORE FUNDAMENTALS</span>
+                    <span className="text-slate-500 text-[8px] tracking-widest font-black uppercase">F-FACTOR</span>
+                  </div>
+
+                  <div className="space-y-1.5 font-mono text-[10px] leading-tight">
+                    {liveMetrics.fundamentals.map((fund: any, idx: number) => (
+                      <div key={idx} className="flex justify-between items-start space-x-1 border-b border-slate-950 pb-1">
+                        <span className="text-slate-500 block truncate max-w-[125px]" title={fund.label}>{fund.label}</span>
+                        <span className={`font-medium text-right ${
+                          fund.bias === 'bullish' ? 'text-emerald-400' :
+                          fund.bias === 'bearish' ? 'text-rose-400' : 'text-slate-300'
+                        }`}>{fund.value}</span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Conditional Futures Calculator Desk */}
           {pair.toUpperCase().includes('_PERP') && (
