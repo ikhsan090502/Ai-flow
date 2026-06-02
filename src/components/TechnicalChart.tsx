@@ -172,12 +172,14 @@ export default function TechnicalChart({ selectedAsset, prices, onSelectAsset }:
     if (!isLive || !symbol) return;
 
     const interval = setInterval(() => {
+      const now = new Date();
+      setLastTickTime(now);
+
       setChartData(prevData => {
         if (prevData.length === 0) return [];
         
         // Pull latest from current prices prop
         const newestLivePrice = prices[symbol.toUpperCase()]?.price || currentPrice;
-        const now = new Date();
         
         const updated = [...prevData];
         const latestCandle = { ...updated[updated.length - 1] };
@@ -205,19 +207,26 @@ export default function TechnicalChart({ selectedAsset, prices, onSelectAsset }:
           updated[updated.length - 1] = latestCandle;
         }
 
-        // Cache historical state
-        setHistoryCache(prevCache => ({
-          ...prevCache,
-          [symbol]: updated
-        }));
-        setLastTickTime(now);
-
         return updated;
       });
     }, 1000);
 
     return () => clearInterval(interval);
   }, [isLive, symbol, prices, currentPrice]);
+
+  // 4y. Synchronize chartData changes back to historyCache to avoid side-effects inside state updaters
+  useEffect(() => {
+    if (chartData.length > 0 && symbol) {
+      setHistoryCache(prevCache => {
+        // Simple comparison to prevent useless state transitions and infinite loops
+        if (prevCache[symbol] === chartData) return prevCache;
+        return {
+          ...prevCache,
+          [symbol]: chartData
+        };
+      });
+    }
+  }, [chartData, symbol]);
 
   // 4b. Instant sub-second ticker: immediately pulses current active candle close/wicks when the live prices ticks
   useEffect(() => {

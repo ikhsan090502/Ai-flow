@@ -509,18 +509,24 @@ let signalsHistory: ServerSignal[] = [
   }
 ];
 
-// POST Analyze with Gemini API
+// POST Analyze with Gemini or OpenRouter API
 app.post('/api/analyze', async (req, res) => {
-  const { pair, currentPrice, timeframe, indicators, customPrompt, tradingStyle, pastAnalyses, compiledMetrics } = req.body;
+  const { 
+    pair, 
+    currentPrice, 
+    timeframe, 
+    indicators, 
+    customPrompt, 
+    tradingStyle, 
+    pastAnalyses, 
+    compiledMetrics, 
+    aiEngine = 'gemini', 
+    openRouterModel = 'meta-llama/llama-3.3-70b-instruct', 
+    openRouterApiKey 
+  } = req.body;
 
   if (!pair || !currentPrice) {
     return res.status(400).json({ error: 'Pair and currentPrice are required' });
-  }
-
-  if (!ai) {
-    return res.status(500).json({ 
-      error: 'Gemini API Key is not configured. Please supply GEMINI_API_KEY in Settings > Secrets.' 
-    });
   }
 
   // Format a compact summary of past analyses for AI context
@@ -560,11 +566,27 @@ ${Array.isArray(fundamentals) ? fundamentals.map((f: any) => `- ${f.label}: ${f.
     `.trim();
   }
 
-  // Build high impact prompt
+  // Build high impact prompt that forces objective and timeframe-calibrated analysis
   const systemPrompt = `Kamu adalah FuturesMax AI, sebuah sistem AI analis profesional elit di pasar Crypto, Forex, Komoditas, dan Saham Indonesia (IDX) yang dilengkapi dengan "Continuous Learning Cognitive Circuitry" (Sistem Memori Pembelajaran Berkelanjutan).
-Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan parameter input, data live pasar teragregasi yang kami sediakan, dan memberikan rekomendasi serta sinyal perdagangan (Signal Entry) yang akurat dan kredibel.
+Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan parameter input dan data live pasar teragregasi yang kami sediakan, dan memberikan rekomendasi serta sinyal perdagangan (Signal Entry) yang akurat dan kredibel.
 
-Jika aset adalah Saham Indonesia (misal: BBCA, BBRI, TLKM, GOTO, BMRI, ASII), analisislah dengan dinamika khas pasar saham domestik Indonesia (IHSG / BEI) dan pastikan memberikan harga entryPrice, takeProfit1, takeProfit2, dan stopLoss dalam bentuk angka bulat Rupiah (integer tanpa decimal sepeser pun).
+🎯 ATURAN MUTLAK INDIKATOR TERPILIH (PENTINGNYA INTEGRASI INDIKATOR SISTEM):
+Kamu HANYA diperbolehkan menyandarkan analisismu dan keputusan sinyal (BUY/SELL/NEUTRAL) pada indikator-indikator teknikal yang aktif dan dipilih oleh pengguna berikut: [ ${(indicators || []).join(', ')} ]. Jangan pernah berspekulasi, menyimpulkan, atau menyisipkan indikator teknikal lain yang tidak dipilih atau tidak dicentang di atas! Jika indikator terpilih adalah "RSI" dan "EMA-50", batasi visualisasi dan analisis logika algoritma kognitifmu hanya pada kedua indikator tersebut.
+
+⚠️ PENTING: ATURAN PENGAMBILAN KEPUTUSAN BUY / SELL / NEUTRAL (ANTI-BIAS BELI):
+Jangan bias ke BUY saja! Mayoritas analis kognitif seringkali terjebak menyajikan rekomendasi BUY demi rasa aman semu. Kamu wajib mandiri, berani, objektif, dan seimbang berdasarkan indikator riil terpilih.
+Tentukan jenis aksi trading ('type') secara rasional:
+1. Jika indikator terpilih [ ${(indicators || []).join(', ')} ] memberikan sinyal bearish (misalnya RSI tinggi/overbought >= 60, harga mendekati Pivot Resistance R1/R2, harga di atas garis Upper Bollinger Band, EMA-50 melintas di bawah EMA-200, atau MACD Histogram negatif), kamu WAJIB merekomendasikan aksi 'SELL'. Jangan ragu menyampaikan sinyal short/sell.
+2. Jika indikator terpilih [ ${(indicators || []).join(', ')} ] memberikan sinyal bullish (misalnya RSI rendah/oversold <= 40, harga mendekati Pivot Support S1/S2, harga di bawah Lower Bollinger Band, EMA-50 melintas di atas EMA-200, atau MACD Histogram positif), kamu baru merekomendasikan aksi 'BUY'.
+3. Jika indikator tidak meyakinkan, saling bertolak belakang (misal RSI netral 45-55, MACD lemah, Bollinger menyempit ketat/flat, atau tidak ada arah tren yang kuat), tentukan aksi 'NEUTRAL'. Jangan paksakan membuat sinyal entry aktif! Berikan rasio analisis realistis demi keselamatan dana trading pengguna.
+
+⌛ PENENTUAN TIMEFRAME & GAYA TRADING (DESAIN TARGET RISIKO & RASIO TP/SL):
+Timeframe "${timeframe || 'M15'}" dan Gaya Trading "${tradingStyle || 'Bebas'}" adalah penentu utama pips atau jarak persentase antara harga entry, takeProfit1, takeProfit2, dan stopLoss! Hubungkan pips/persentase ini secara matematis yang sangat ketat:
+- Untuk timeframe sangat pendek (M1, M5) dengan gaya SCALP: Sinyal harus dirancang sangat ketat. Jarak TP1 ke Entry harus berkisar di rentang mikro: 0.1% s/d 0.35% (Crypto) atau 5 s/d 12 pips (Forex) atau $1.5 s/d $3.5 (Gold/XAUUSD). Stop Loss juga sangat rapat: 0.1% s/d 0.3% (Crypto) atau 4 s/d 10 pips (Forex).
+- Untuk timeframe jangka menengah (M15, M30, H1) dengan gaya DAY TRADE: Target TP1 berkisar di rentang intraday: 0.5% s/d 1.5% (Crypto) atau 15 s/d 40 pips (Forex) atau $5.0 s/d $12.0 (Gold/XAUUSD). Stop Loss berkisar: 0.4% s/d 1.0% (Crypto) atau 12 s/d 30 pips (Forex).
+- Untuk timeframe jangka panjang (H4, D1, W1) with gaya SWING atau POSITION: Target TP1 berkisar di rentang swing besar: 3.5% s/d 15.0% (Crypto) atau 80 s/d 250 pips (Forex) atau $20.0 s/d $80.0 (Gold/XAUUSD). Stop Loss disesuaikan lebar demi menghindari sumbu manipulatif: 2.0% s/d 6.0% (Crypto) atau 50 s/d 100 pips (Forex).
+
+Untuk Saham Indonesia (misal: BBCA, BBRI, TLKM, GOTO, BMRI, ASII), pastikan memberikan harga entryPrice, takeProfit1, takeProfit2, dan stopLoss dalam bentuk angka bulat Rupiah (integer tanpa desimal sepeser pun).
 Jika indikator opsional mengandung 'Momentum Pembalikan', fokuskan analisis pada penemuan pola-pola pembalikan tren (reversal momentum) seperti bullish/bearish divergence, overbought/oversold exhaustion, double bottom/top, head and shoulders, atau harmonic patterns, serta konfirmasi kegagalan breakout (liquidity sweep).
 
 RIWAYAT ANALISIS TERDAHULU UNTUK PEMBELAJARAN (COGNITIVE MEMORY LOG):
@@ -575,68 +597,116 @@ ${compiledMetrics ? `DATA AGREGATOR LIVE PASAR UNTUK REKTIFIKASI (WAJIB DIBACA D
 ${compiledMetricsContext}` : ''}
 
 REKAYASA SINYAL SESUAI GAYA TRADING:
-- Tentukan jenis aksi trading: 'BUY', 'SELL', atau 'NEUTRAL'.
-- Tentukan gaya trading ('style') di mana kamu WAJIB memprioritaskan gaya trading berikut: "${tradingStyle || 'bebas'}". Gaya trading ini harus diisi dengan salah satu dari pilihan format: 'SCALP' (Scalping detik/menit sangat cepat), 'DAY TRADE' (Day Trading harian/jam), 'SWING' (Swing Trading berhari-hari), atau 'POSITION' (Position Trading jangka panjang berminggu-minggu). Sesuaikan target rasio dan jarak persentase keuntungan dengan gaya ini (Scalp butuh target sangat tipis dan rapat; Position butuh target sangat jauh dan lebar).
+- Tentukan jenis aksi trading ('type'): 'BUY', 'SELL', atau 'NEUTRAL'.
+- Tentukan gaya trading ('style') di mana kamu WAJIB memprioritaskan gaya trading berikut: "${tradingStyle || 'bebas'}". Gaya trading ini harus diisi dengan salah satu dari pilihan format: 'SCALP', 'DAY TRADE', 'SWING', atau 'POSITION'.
 - Tentukan harga 'entryPrice' yang sangat rasional (berdekatan dengan harga sekarang yaitu ${currentPrice}).
-- Berikan target 'takeProfit1' dan 'takeProfit2' serta batas pengaman 'stopLoss' yang logis sesuai kaidah risk/reward ratio sehat (minimum 1:1.5 ketat). Untuk SCALP, gunakan pips/target yang rapat. Untuk POSITION atau SWING, gunakan pertimbangan jangka panjang.
+- Berikan target 'takeProfit1' dan 'takeProfit2' serta batas pengaman 'stopLoss' yang logis sesuai kaidah risk/reward ratio sehat (minimum 1:1.5 ketat). SANGAT WAJIB SESUAIKAN Jarak TP/SL dengan kerangka waktu analisis (timeframe) "${timeframe || 'M15'}" yang telah dicantumkan di atas!
 - Atur tingkat kepercayaan 'confidence': dapat berkisar antara 'HIGH', 'MEDIUM', atau 'LOW'.
 
 STRUKTUR ANALISIS (Tulis semua penjelasan dalam Bahasa Indonesia yang profesional, tegas, dan berbobot tanpa istilah main-main):
-- 'sentiment': Jelaskan dinamika pelaku pasar dengan detail, psikologi pembeli/penjual di area harga sekarang sesuai gaya trading "${tradingStyle || 'bebas'}" dan data sentimen pasar di atas, serta korelasi volume transaksi.
-- 'mtfAnalysis': Jelaskan analisis multi-timeframe komprehensif sesuai durasi investasi, menghubungkan kerangka waktu besar (HTF) dan kerangka waktu kecil (LTF), serta integrasikan pembacaan EMA, MACD, dan Pivot dari data live pasar jika tersedia.
-- 'bullishCase': Argumen teknikal & fundamental kuat mengapa harga berpeluang naik (sisipkan data RSI, Bollinger Bands, FVG, atau Fundamental rasio dari data agregator jika relevan).
-- 'bearishCase': Argumen teknikal & fundamental kuat mengapa harga berpeluang turun (sisipkan resistensi tangguh, data fear/greed, sirkulasi global, atau fundamental negatif dari agregator jika relevan).
-- 'learningFeedback': Berikan 1-2 kalimat analisis kritis/metakognitif tentang apa yang kamu pelajari dari riwayat masa lalu (jika ada) atau bagaimana sirkuit analisismu disempurnakan berdasarkan gaya trading "${tradingStyle || 'bebas'}" dan parameter instrumen ${pair} (misal: "Berdasarkan memori transaksi volatilitas tinggi di masa lalu, kami menyerap parameter baru untuk mengoptimalkan keandalan take profit pada ${pair}" atau "Mempelajari sirkuit historis, kami memperketat stop loss M15 guna mencegah slippage spread").
+- 'sentiment': Jelaskan dinamika pelaku pasar dengan detail, psikologi pembeli/penjual di area harga sekarang berdasarkan indikator terpilih [ ${(indicators || []).join(', ')} ] dan data sentimen pasar di atas.
+- 'mtfAnalysis': Jelaskan analisis multi-timeframe komprehensif, hubungkan TF ${timeframe || 'M15'} secara eksplisit dengan HTF dan LTF, dan fokuskan HANYA pada indikator terpilih [ ${(indicators || []).join(', ')} ] yang aktif.
+- 'bullishCase': Argumen teknikal & fundamental mengapa harga berpeluang naik, dianalisis spesifik dari perspektif indikator yang dipilih di atas.
+- 'bearishCase': Argumen teknikal & fundamental mengapa harga berpeluang turun, dianalisis spesifik dari perspektif indikator yang dipilih di atas yaitu [ ${(indicators || []).join(', ')} ].
+- 'learningFeedback': Berikan 1-2 kalimat analisis kritis/metakognitif tentang keselarasan indikator terpilih [ ${(indicators || []).join(', ')} ] terhadap gaya trading "${tradingStyle || 'bebas'}" dan parameter instrumen ${pair}.
 
 PERHATIKAN HARGA YANG DIIKUTI:
 Pasangan aset: ${pair}
 Harga sekarang: ${currentPrice}
-Waktu analisis: ${timeframe || 'M15'}
+Waktu analisis (Timeframe): ${timeframe || 'M15'}
 Gaya trading yang diminta: ${tradingStyle || 'Bebas / Sesuai Timeframe'}
-Indikator opsional bantuan: ${(indicators || []).join(', ')}
+Indikator opsional bantuan yang wajib dianalisis: ${(indicators || []).join(', ')}
 ${customPrompt ? `Konteks atau catatan tambahan pengguna: ${customPrompt}` : ''}
 
 Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
 
   try {
-    const response = await generateContentWithRetry((modelName) => ai!.models.generateContent({
-      model: modelName,
-      contents: [
-        { text: systemPrompt }
-      ],
-      config: {
-        responseMimeType: 'application/json',
-        responseSchema: {
-          type: Type.OBJECT,
-          properties: {
-            pair: { type: Type.STRING },
-            type: { type: Type.STRING }, // BUY, SELL, NEUTRAL
-            style: { type: Type.STRING }, // SCALP, DAY TRADE, SWING
-            entryPrice: { type: Type.NUMBER },
-            takeProfit1: { type: Type.NUMBER },
-            takeProfit2: { type: Type.NUMBER },
-            stopLoss: { type: Type.NUMBER },
-            confidence: { type: Type.STRING }, // HIGH, MEDIUM, LOW
-            sentiment: { type: Type.STRING },
-            mtfAnalysis: { type: Type.STRING },
-            bullishCase: { type: Type.STRING },
-            bearishCase: { type: Type.STRING },
-            learningFeedback: { type: Type.STRING }
-          },
-          required: [
-            'pair', 'type', 'style', 'entryPrice', 'takeProfit1', 'takeProfit2', 'stopLoss', 'confidence', 'sentiment', 'mtfAnalysis', 'bullishCase', 'bearishCase', 'learningFeedback'
-          ]
-        }
-      }
-    }));
+    let rawTextOutput = '{}';
 
-    const textOutput = response.text || '{}';
-    const analysisResult = JSON.parse(textOutput);
+    // Check if writing through OpenRouter vs Gemini
+    const defaultOpenRouterKey = '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';
+    if (aiEngine === 'openrouter' && (openRouterApiKey || process.env.OPENROUTER_API_KEY || defaultOpenRouterKey)) {
+      const activeApiKey = openRouterApiKey || process.env.OPENROUTER_API_KEY || defaultOpenRouterKey;
+      const activeModel = openRouterModel || 'meta-llama/llama-3.3-70b-instruct';
+
+      const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${activeApiKey}`,
+          'HTTP-Referer': 'https://ai.studio/build',
+          'X-Title': 'FuturesMax AI Flow'
+        },
+        body: JSON.stringify({
+          model: activeModel,
+          messages: [
+            {
+              role: 'system',
+              content: 'Kamu adalah sistem analisis pasar keuangan ahli. Keluaran respons kamu harus selalu berupa JSON valid dan murni.'
+            },
+            {
+              role: 'user',
+              content: systemPrompt
+            }
+          ],
+          response_format: { type: 'json_object' }
+        })
+      });
+
+      if (!openRouterRes.ok) {
+        const errorText = await openRouterRes.text();
+        throw new Error(`OpenRouter gagal merespons: ${errorText || openRouterRes.statusText}`);
+      }
+
+      const resData = await openRouterRes.json();
+      rawTextOutput = resData.choices?.[0]?.message?.content || '{}';
+    } else {
+      // Fallback or explicit Google Gemini Engine
+      if (!ai) {
+        throw new Error('Gemini API Key tidak terkonfigurasi pada server. Silakan beri kunci API OpenRouter atau pasang GEMINI_API_KEY.');
+      }
+
+      const response = await generateContentWithRetry((modelName) => ai!.models.generateContent({
+        model: modelName,
+        contents: [
+          { text: systemPrompt }
+        ],
+        config: {
+          responseMimeType: 'application/json',
+          responseSchema: {
+            type: Type.OBJECT,
+            properties: {
+              pair: { type: Type.STRING },
+              type: { type: Type.STRING }, // BUY, SELL, NEUTRAL
+              style: { type: Type.STRING }, // SCALP, DAY TRADE, SWING
+              entryPrice: { type: Type.NUMBER },
+              takeProfit1: { type: Type.NUMBER },
+              takeProfit2: { type: Type.NUMBER },
+              stopLoss: { type: Type.NUMBER },
+              confidence: { type: Type.STRING }, // HIGH, MEDIUM, LOW
+              sentiment: { type: Type.STRING },
+              mtfAnalysis: { type: Type.STRING },
+              bullishCase: { type: Type.STRING },
+              bearishCase: { type: Type.STRING },
+              learningFeedback: { type: Type.STRING }
+            },
+            required: [
+              'pair', 'type', 'style', 'entryPrice', 'takeProfit1', 'takeProfit2', 'stopLoss', 'confidence', 'sentiment', 'mtfAnalysis', 'bullishCase', 'bearishCase', 'learningFeedback'
+            ]
+          }
+        }
+      }));
+
+      rawTextOutput = response.text || '{}';
+    }
+
+    // Clean potential markdown markdown blocks just in case
+    const cleanedTextOutput = rawTextOutput.replace(/```json\s*/ig, '').replace(/```\s*$/ig, '').trim();
+    const analysisResult = JSON.parse(cleanedTextOutput);
 
     // Inject unique server ID and generate a running record from the dynamic signal
     const isCrypto = pair.toUpperCase().includes('USDT');
     const isStock = ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO', 'BMRI'].some(s => pair.toUpperCase().startsWith(s));
-    const multiplier = isStock ? 1 : (isCrypto ? 100 : (pair.toUpperCase().includes('JPY') ? 100 : 10000));
     
     // Align analysis entry and levels with ultra-fresh current cached price to solve AI latency/slippage
     const activePairUpper = (analysisResult.pair || pair).toUpperCase();
