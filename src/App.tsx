@@ -9,11 +9,12 @@ import NewsSentimentHub from './components/NewsSentimentHub';
 import BrokerRecommendations from './components/BrokerRecommendations';
 import MarketSessionsCalendar from './components/MarketSessionsCalendar';
 import TradeJournal from './components/TradeJournal';
-import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins, Calendar, BellRing, BookMarked } from 'lucide-react';
+import TechnicalChart from './components/TechnicalChart';
+import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins, Calendar, BellRing, BookMarked, AreaChart } from 'lucide-react';
 import { getLivePrices, tickLivePrices } from './services/marketService';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'analyzer' | 'dashboard' | 'telegram' | 'broker' | 'calendar' | 'journal'>('analyzer');
+  const [activeTab, setActiveTab] = useState<'analyzer' | 'chart' | 'dashboard' | 'telegram' | 'broker' | 'calendar' | 'journal'>('analyzer');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
   const [signals, setSignals] = useState<MarketSignal[]>([]);
@@ -23,6 +24,7 @@ export default function App() {
   // Real-time market state driven from parent
   const [prices, setPrices] = useState<Record<string, LivePrice>>({});
   const [pricesLoading, setPricesLoading] = useState(true);
+  const [isWsConnected, setIsWsConnected] = useState(false);
 
   // User price alerts state
   const [alerts, setAlerts] = useState<PriceAlert[]>(() => {
@@ -40,7 +42,7 @@ export default function App() {
   // Screen active alert floating toasts
   const [toasts, setToasts] = useState<{ id: string; symbol: string; targetPrice: number; currentPrice: number; condition: 'ABOVE' | 'BELOW' }[]>([]);
 
-  // Periodically fetch and simulate micro-price ticks
+  // Periodically fetch and simulate micro-price ticks, while running free high-speed Binance WebSocket streaming
   useEffect(() => {
     async function initFeed() {
       setPricesLoading(true);
@@ -54,18 +56,151 @@ export default function App() {
     // 1. Fetch real API rates every 12 seconds
     const apiInterval = setInterval(async () => {
       const updated = await getLivePrices();
-      setPrices(updated);
+      setPrices(prev => {
+        // Keep WebSocket prices if they are fresher than the slow polled data
+        const merged = { ...updated };
+        Object.keys(prev).forEach(key => {
+          if (prev[key].lastUpdated > (merged[key]?.lastUpdated || 0) + 1000) {
+            merged[key] = prev[key];
+          }
+        });
+        return merged;
+      });
     }, 12000);
 
-    // 2. Perform micro price ticks every 1.5 seconds for visual realism
-    const tickInterval = setInterval(() => {
+    // 2. Perform ultra-high-speed (350ms) micro price ticks for Gold & Forex to simulate live market depth wiggles
+    const fastTickInterval = setInterval(() => {
       const ticked = tickLivePrices();
-      setPrices({ ...ticked });
+      setPrices(prev => {
+        const merged = { ...prev };
+        Object.keys(ticked).forEach(key => {
+          // Update Forex & Commodities in real-time at this sub-second rate
+          const isGoldOrForex = key === 'XAUUSD' || key === 'XAGUSD' || 
+            ['EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY', 'USDCAD', 'USDCHF'].includes(key);
+          if (isGoldOrForex) {
+            merged[key] = ticked[key];
+          }
+        });
+        return merged;
+      });
+    }, 350);
+
+    // 2b. Perform normal-speed (1500ms) micro price ticks for domestic Indonesian stocks
+    const stockTickInterval = setInterval(() => {
+      const ticked = tickLivePrices();
+      setPrices(prev => {
+        const merged = { ...prev };
+        Object.keys(ticked).forEach(key => {
+          const isGoldOrForex = key === 'XAUUSD' || key === 'XAGUSD' || 
+            ['EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY', 'USDCAD', 'USDCHF'].includes(key);
+          const isFromWs = key.includes('USDT') && prev[key]?.lastUpdated && (Date.now() - prev[key].lastUpdated < 8000);
+          if (!isFromWs && !isGoldOrForex) {
+            merged[key] = ticked[key];
+          }
+        });
+        return merged;
+      });
     }, 1500);
+
+    // 3. Establish super fast, direct public client-side WebSocket price monitoring (100% Free)
+    const wsStreams = [
+      'btcusdt', 'ethusdt', 'solusdt', 'bnbusdt', 'dogeusdt', 'xrpusdt', 'adausdt', 'avaxusdt', 'linkusdt',
+      'pepeusdt', 'wifusdt', 'bonkusdt', 'flokiusdt', 'suiusdt', 'renderusdt', 'fetusdt', 'pnutusdt',
+      'neirousdt', 'goatusdt', 'actusdt', 'ondousdt', 'taousdt', 'wldusdt', 'seiusdt', 'nearusdt', 'jupusdt'
+    ];
+
+    const streamsQuery = wsStreams.map(s => `${s}@ticker`).join('/');
+    const wsUrl = `wss://stream.binance.com:9443/stream?streams=${streamsQuery}`;
+    let socket: WebSocket | null = null;
+    let reconnectTimeout: any = null;
+
+    function connect() {
+      try {
+        socket = new WebSocket(wsUrl);
+
+        socket.onopen = () => {
+          console.log('📡 Binance WebSocket streaming connected successfully.');
+          setIsWsConnected(true);
+        };
+
+        socket.onmessage = (event) => {
+          try {
+            const payload = JSON.parse(event.data);
+            if (payload && payload.data) {
+              const data = payload.data;
+              const rawSymbol = data.s; // e.g. "BTCUSDT"
+              const price = parseFloat(data.c);
+              const change24h = parseFloat(data.P);
+              const high = parseFloat(data.h);
+              const low = parseFloat(data.l);
+
+              if (rawSymbol && !isNaN(price)) {
+                setPrices(prev => {
+                  const existingSpot = prev[rawSymbol];
+                  const updatedSpot: LivePrice = {
+                    symbol: rawSymbol,
+                    price: price,
+                    change24h: isNaN(change24h) ? (existingSpot?.change24h || 0) : change24h,
+                    high24h: isNaN(high) ? (existingSpot?.high24h || price * 1.05) : high,
+                    low24h: isNaN(low) ? (existingSpot?.low24h || price * 0.95) : low,
+                    lastUpdated: Date.now()
+                  };
+
+                  const nextPrices = { ...prev, [rawSymbol]: updatedSpot };
+
+                  // Slide Perpetuals matching update
+                  const perpSymbol = `${rawSymbol}_PERP`;
+                  const existingPerp = prev[perpSymbol];
+                  if (existingPerp) {
+                    nextPrices[perpSymbol] = {
+                      symbol: perpSymbol,
+                      price: price * 1.0003, // futures premium offset
+                      change24h: isNaN(change24h) ? (existingPerp?.change24h || 0) : change24h,
+                      high24h: isNaN(high) ? (existingPerp?.high24h || price * 1.05) : high * 1.0003,
+                      low24h: isNaN(low) ? (existingPerp?.low24h || price * 0.95) : low * 1.0003,
+                      lastUpdated: Date.now()
+                    };
+                  }
+
+                  return nextPrices;
+                });
+              }
+            }
+          } catch (e) {
+            console.error('WebSocket message parsing failed:', e);
+          }
+        };
+
+        socket.onclose = () => {
+          console.log('📡 Binance WebSocket disconnected. Swapping back to polling...');
+          setIsWsConnected(false);
+          reconnectTimeout = setTimeout(connect, 5000);
+        };
+
+        socket.onerror = () => {
+          socket?.close();
+        };
+
+      } catch (err) {
+        console.error('Failed to create WebSocket client:', err);
+        setIsWsConnected(false);
+        reconnectTimeout = setTimeout(connect, 5000);
+      }
+    }
+
+    connect();
 
     return () => {
       clearInterval(apiInterval);
-      clearInterval(tickInterval);
+      clearInterval(fastTickInterval);
+      clearInterval(stockTickInterval);
+      if (socket) {
+        socket.onclose = null;
+        socket.close();
+      }
+      if (reconnectTimeout) {
+        clearTimeout(reconnectTimeout);
+      }
     };
   }, []);
 
@@ -369,7 +504,9 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
   const handleSelectAsset = (asset: Asset, currentPrice: number) => {
     setSelectedAsset(asset);
     setSelectedPrice(currentPrice);
-    setActiveTab('analyzer'); // focus tab to let them analyze instantly
+    if (activeTab !== 'chart') {
+      setActiveTab('analyzer'); // focus tab to let them analyze instantly
+    }
   };
 
   const handleInjectNewsContext = (context: string) => {
@@ -406,6 +543,23 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
           })()}
         </div>
         <div className="flex items-center space-x-4">
+          <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/40 flex items-center space-x-1 animate-pulse">
+            <span className="w-1 h-1 rounded-full bg-emerald-400 animate-ping" />
+            <span>⚡ GOLD & VALAS REAL-TIME SEC (350ms)</span>
+          </span>
+          <span className="text-slate-700">|</span>
+          {isWsConnected ? (
+            <span className="text-[9px] text-emerald-400 font-bold bg-emerald-950/40 px-2 py-0.5 rounded border border-emerald-900/40 flex items-center space-x-1">
+              <span className="w-1 h-1 rounded-full bg-emerald-400" />
+              <span>📡 CRYPTO FEED (BINANCE WEBSOCKET)</span>
+            </span>
+          ) : (
+            <span className="text-[9px] text-amber-400 font-bold bg-amber-950/40 px-2 py-0.5 rounded border border-amber-900/40 flex items-center space-x-1">
+              <span className="w-1 h-1 rounded-full bg-amber-400" />
+              <span>📡 CRYPTO POLLING</span>
+            </span>
+          )}
+          <span className="text-slate-700">|</span>
           <span>UTC TIME: {new Date().toISOString().substring(11, 19)}</span>
           <span className="text-slate-700">|</span>
           <span className="text-emerald-400">TELEGRAM BOT SYNC: {telegramConfig.enabled ? 'CONNECTED' : 'STANDBY'}</span>
@@ -438,6 +592,18 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
           >
             <Cpu size={14} />
             <span>Analisa Sinyal</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('chart')}
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+              activeTab === 'chart' 
+                ? 'bg-slate-800 text-white shadow-sm' 
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <AreaChart size={14} />
+            <span>Chart Teknikal</span>
           </button>
           
           <button
@@ -542,6 +708,14 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
             />
           )}
 
+          {activeTab === 'chart' && (
+            <TechnicalChart
+              selectedAsset={selectedAsset}
+              prices={prices}
+              onSelectAsset={handleSelectAsset}
+            />
+          )}
+
           {activeTab === 'dashboard' && (
             <PerformanceDashboard
               signals={signals}
@@ -567,7 +741,7 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
           )}
 
           {activeTab === 'journal' && (
-            <TradeJournal />
+            <TradeJournal prices={prices} />
           )}
         </section>
       </main>

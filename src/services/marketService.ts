@@ -12,7 +12,7 @@ export function formatAssetPrice(price: number, type: string): number {
 }
 
 const FIXED_SEEDS: Record<string, { price: number; change24h: number }> = {
-  XAUUSD: { price: 4562.42, change24h: 1.17 },
+  XAUUSD: { price: 4509.00, change24h: 1.17 },
   XAGUSD: { price: 77.56, change24h: 2.76 },
   EURUSD: { price: 1.1636, change24h: 0.30 },
   GBPUSD: { price: 1.3475, change24h: 0.41 },
@@ -140,6 +140,7 @@ export async function getLivePrices(): Promise<Record<string, LivePrice>> {
         const asset = SUPPORTED_ASSETS.find(a => a.symbol === key);
         if (asset) {
           const raw = data[key];
+          
           currentPrices[key] = {
             symbol: key,
             price: formatAssetPrice(raw.price, asset.type),
@@ -158,11 +159,11 @@ export async function getLivePrices(): Promise<Record<string, LivePrice>> {
 
   // Backup premium browser-direct API fetcher for static deployments (Github Pages etc.)
   try {
-    // 1. Fetch Spot Gold / Silver from Gold-API
-    const goldPromise = fetch('https://api.gold-api.com/api/XAU/USD')
+    // 1. Fetch Spot Gold / Silver from Yahoo Finance Chart API (extremely reliable and open)
+    const goldPromise = fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d')
       .then(r => r.ok ? r.json() : null)
       .catch(() => null);
-    const silverPromise = fetch('https://api.gold-api.com/api/XAG/USD')
+    const silverPromise = fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=1d')
       .then(r => r.ok ? r.json() : null)
       .catch(() => null);
 
@@ -184,27 +185,47 @@ export async function getLivePrices(): Promise<Record<string, LivePrice>> {
     ]);
 
     // Apply Gold
-    if (goldData && typeof goldData.price === 'number') {
+    let goldVal: number | null = null;
+    if (goldData) {
+      const result = goldData?.chart?.result?.[0];
+      const price = result?.meta?.regularMarketPrice;
+      if (price) goldVal = price;
+    }
+    if (!goldVal && forexData && forexData.rates && forexData.rates.XAU) {
+      goldVal = 1 / forexData.rates.XAU;
+    }
+
+    if (goldVal) {
       const xau = currentPrices['XAUUSD'];
       currentPrices['XAUUSD'] = {
         symbol: 'XAUUSD',
-        price: goldData.price,
-        change24h: xau ? xau.change24h : 1.17,
-        high24h: formatAssetPrice(goldData.price * 1.015, 'commodity'),
-        low24h: formatAssetPrice(goldData.price * 0.985, 'commodity'),
+        price: formatAssetPrice(goldVal, 'commodity'),
+        change24h: xau ? xau.change24h : -0.15,
+        high24h: formatAssetPrice(goldVal * 1.015, 'commodity'),
+        low24h: formatAssetPrice(goldVal * 0.985, 'commodity'),
         lastUpdated: Date.now()
       };
     }
 
     // Apply Silver
-    if (silverData && typeof silverData.price === 'number') {
+    let silverVal: number | null = null;
+    if (silverData) {
+      const result = silverData?.chart?.result?.[0];
+      const price = result?.meta?.regularMarketPrice;
+      if (price) silverVal = price;
+    }
+    if (!silverVal && forexData && forexData.rates && forexData.rates.XAG) {
+      silverVal = 1 / forexData.rates.XAG;
+    }
+
+    if (silverVal) {
       const xag = currentPrices['XAGUSD'];
       currentPrices['XAGUSD'] = {
         symbol: 'XAGUSD',
-        price: silverData.price,
-        change24h: xag ? xag.change24h : 2.76,
-        high24h: formatAssetPrice(silverData.price * 1.025, 'commodity'),
-        low24h: formatAssetPrice(silverData.price * 0.975, 'commodity'),
+        price: formatAssetPrice(silverVal, 'commodity'),
+        change24h: xag ? xag.change24h : 0.45,
+        high24h: formatAssetPrice(silverVal * 1.025, 'commodity'),
+        low24h: formatAssetPrice(silverVal * 0.975, 'commodity'),
         lastUpdated: Date.now()
       };
     }
@@ -255,6 +276,22 @@ export async function getLivePrices(): Promise<Record<string, LivePrice>> {
             };
           }
         });
+
+        // Map PAXGUSDT directly to XAUUSD (Gold spot) for high frequency real-time updates on client side as well
+        if (sym === 'PAXGUSDT') {
+          const rawPrice = parseFloat(item.lastPrice || item.price);
+          const change = parseFloat(item.priceChangePercent);
+          if (!isNaN(rawPrice)) {
+            currentPrices['XAUUSD'] = {
+              symbol: 'XAUUSD',
+              price: formatAssetPrice(rawPrice, 'commodity'),
+              change24h: isNaN(change) ? 0.0 : change,
+              high24h: formatAssetPrice(rawPrice * 1.015, 'commodity'),
+              low24h: formatAssetPrice(rawPrice * 0.985, 'commodity'),
+              lastUpdated: Date.now()
+            };
+          }
+        }
       });
     }
   } catch (directApiErr) {

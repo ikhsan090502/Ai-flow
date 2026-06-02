@@ -7,15 +7,31 @@
         try {
           const originalGlobalThis = window.globalThis || window;
           const originalFetch = window.fetch;
+          let currentFetch = originalFetch;
           
-          // Redefine window.fetch as fully writable and configurable to satisfy external interceptors/setters
+          const descriptor = {
+            get() {
+              return currentFetch;
+            },
+            set(v) {
+              currentFetch = v;
+            },
+            configurable: true,
+            enumerable: true
+          };
+
+          // 1. Redefine fetch with a getter-setter pair on Window.prototype so that direct assignments to window.fetch succeed
+          if (window.Window && Window.prototype) {
+            try {
+              Object.defineProperty(Window.prototype, 'fetch', descriptor);
+            } catch (e) {
+              console.warn('Failed to define fetch on Window.prototype:', e);
+            }
+          }
+
+          // 2. Also try to define it on window directly as fallback or shadow
           try {
-            Object.defineProperty(window, 'fetch', {
-              value: originalFetch,
-              writable: true,
-              configurable: true,
-              enumerable: true
-            });
+            Object.defineProperty(window, 'fetch', descriptor);
           } catch (e) {
             console.warn('Failed to define fetch directly on window:', e);
           }
@@ -24,7 +40,7 @@
           const proxyHandler = {
             get(target, prop) {
               if (prop === 'fetch') {
-                return originalFetch;
+                return currentFetch;
               }
               if (prop === 'globalThis' || prop === 'global' || prop === 'self' || prop === 'window') {
                 return proxy;
@@ -38,7 +54,7 @@
             },
             set(target, prop, value) {
               if (prop === 'fetch') {
-                // Silently bypass writable constraints on protected attributes
+                currentFetch = value;
                 return true;
               }
               target[prop] = value;
@@ -50,8 +66,8 @@
             getOwnPropertyDescriptor(target, prop) {
               if (prop === 'fetch') {
                 return {
-                  value: originalFetch,
-                  writable: true,
+                  get() { return currentFetch; },
+                  set(v) { currentFetch = v; },
                   configurable: true,
                   enumerable: true
                 };

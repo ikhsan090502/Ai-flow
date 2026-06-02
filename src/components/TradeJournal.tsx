@@ -24,10 +24,17 @@ import {
   ChevronUp
 } from 'lucide-react';
 
-export default function TradeJournal() {
+export default function TradeJournal({ prices }: { prices?: Record<string, { price: number; change24h: number }> }) {
   const [entries, setEntries] = useState<TradeJournalEntry[]>([]);
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
+
+  // Synchronize component-level livePrices with real-time websocket prices from App.tsx
+  useEffect(() => {
+    if (prices && Object.keys(prices).length > 0) {
+      setLivePrices(prices);
+    }
+  }, [prices]);
   
   // Form State
   const [pair, setPair] = useState('BTCUSDT');

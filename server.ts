@@ -22,7 +22,7 @@ app.get('/api/health', (req, res) => {
 
 // --- SERVER-SIDE LIVE PRICES CACHE & FETCH PROXY ---
 const SERVER_SEEDS: Record<string, { price: number; change24h: number }> = {
-  XAUUSD: { price: 4562.42, change24h: 1.17 },
+  XAUUSD: { price: 4509.00, change24h: 1.17 },
   XAGUSD: { price: 77.56, change24h: 2.76 },
   EURUSD: { price: 1.1636, change24h: 0.30 },
   GBPUSD: { price: 1.3475, change24h: 0.41 },
@@ -114,6 +114,15 @@ async function updateRealPricesCache() {
               setServerCachedPrice(asset.symbol, rawPrice * perpetualOffset, isNaN(change) ? 0 : change);
             }
           });
+
+          // Map PAXGUSDT directly to XAUUSD (Gold spot) for high frequency real-time updates
+          if (sym === 'PAXGUSDT') {
+            const rawPrice = parseFloat(item.lastPrice || item.price);
+            const change = parseFloat(item.priceChangePercent);
+            if (!isNaN(rawPrice)) {
+              setServerCachedPrice('XAUUSD', rawPrice, isNaN(change) ? 0 : change);
+            }
+          }
         });
       }
     }
@@ -122,6 +131,9 @@ async function updateRealPricesCache() {
   }
 
   // 2. Fetch Forex from ExchangeRate-API (completely open & keyless, updates frequently)
+  let fallbackGold: number | null = null;
+  let fallbackSilver: number | null = null;
+
   try {
     const response = await fetch('https://open.er-api.com/v6/latest/USD');
     if (response.ok) {
@@ -133,37 +145,59 @@ async function updateRealPricesCache() {
       if (rates.JPY) setServerCachedPrice('USDJPY', rates.JPY, 0.35);
       if (rates.CAD) setServerCachedPrice('USDCAD', rates.CAD, -0.10);
       if (rates.CHF) setServerCachedPrice('USDCHF', rates.CHF, -0.18);
+
+      if (rates.XAU) fallbackGold = 1 / rates.XAU;
+      if (rates.XAG) fallbackSilver = 1 / rates.XAG;
     }
   } catch (err) {
     console.error('ExchangeRate Forex fetch failed on server:', err);
   }
 
-  // 3. Fetch Spot Gold & Silver from Gold-API (completely open & keyless)
+  // 3. Fetch Spot Gold & Silver from Yahoo Finance / ExchangeRate-API (completely keyless)
   try {
     const [goldRes, silverRes] = await Promise.all([
-      fetch('https://api.gold-api.com/api/XAU/USD').catch(() => null),
-      fetch('https://api.gold-api.com/api/XAG/USD').catch(() => null)
+      fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d').catch(() => null),
+      fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=1d').catch(() => null)
     ]);
     
+    let goldPrice: number | null = null;
+    let silverPrice: number | null = null;
+    let goldChange = -0.15;
+    let silverChange = 0.45;
+
     if (goldRes && goldRes.ok) {
-      const goldData = await goldRes.json();
-      if (goldData && typeof goldData.price === 'number') {
-        const existing = cachedPrices['XAUUSD'];
-        const change = existing ? existing.change24h : -0.15;
-        setServerCachedPrice('XAUUSD', goldData.price, change);
+      const json = await goldRes.json();
+      const result = json?.chart?.result?.[0];
+      const price = result?.meta?.regularMarketPrice;
+      const prevClose = result?.meta?.chartPreviousClose;
+      if (price !== undefined && price !== null) {
+        goldPrice = price;
+        if (prevClose) {
+          goldChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+        }
       }
     }
     
     if (silverRes && silverRes.ok) {
-      const silverData = await silverRes.json();
-      if (silverData && typeof silverData.price === 'number') {
-        const existing = cachedPrices['XAGUSD'];
-        const change = existing ? existing.change24h : 0.45;
-        setServerCachedPrice('XAGUSD', silverData.price, change);
+      const json = await silverRes.json();
+      const result = json?.chart?.result?.[0];
+      const price = result?.meta?.regularMarketPrice;
+      const prevClose = result?.meta?.chartPreviousClose;
+      if (price !== undefined && price !== null) {
+        silverPrice = price;
+        if (prevClose) {
+          silverChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+        }
       }
     }
+
+    const finalGold = goldPrice || (cachedPrices['XAUUSD'] ? cachedPrices['XAUUSD'].price : null) || fallbackGold || 4509.00;
+    const finalSilver = silverPrice || fallbackSilver || (cachedPrices['XAGUSD'] ? cachedPrices['XAGUSD'].price : 23.5);
+
+    setServerCachedPrice('XAUUSD', finalGold, goldChange);
+    setServerCachedPrice('XAGUSD', finalSilver, silverChange);
   } catch (err) {
-    console.error('Gold/Silver spot fetch failed on server:', err);
+    console.error('Gold/Silver spot Yahoo/fallback fetch failed on server:', err);
   }
 
   // 4. Fallback Yahoo Fetch for IDX stock prices (handles dns exceptions cleanly)
@@ -209,6 +243,7 @@ async function updateRealPricesCache() {
 
 function setServerCachedPrice(symbol: string, price: number, change: number) {
   const existing = cachedPrices[symbol];
+  
   cachedPrices[symbol] = {
     symbol,
     price,
@@ -547,24 +582,33 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
     const isStock = ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO', 'BMRI'].some(s => pair.toUpperCase().startsWith(s));
     const multiplier = isStock ? 1 : (isCrypto ? 100 : (pair.toUpperCase().includes('JPY') ? 100 : 10000));
     
-    // Default initial profit/pips calculated on the analysis result vs initial value (Neutral starts at 0)
+    // Align analysis entry and levels with ultra-fresh current cached price to solve AI latency/slippage
+    const activePairUpper = (analysisResult.pair || pair).toUpperCase();
+    const liveCache = cachedPrices[activePairUpper];
+    const livePriceRightNow = liveCache ? liveCache.price : Number(currentPrice);
+    
+    const suggestedEntry = Number(analysisResult.entryPrice) || Number(currentPrice);
+    const priceDiff = livePriceRightNow - suggestedEntry;
+
+    // Apply the real-time latency alignment
+    const finalEntryPrice = livePriceRightNow;
+    const finalTakeProfit1 = Number(analysisResult.takeProfit1) + priceDiff;
+    const finalTakeProfit2 = Number(analysisResult.takeProfit2) + priceDiff;
+    const finalStopLoss = Number(analysisResult.stopLoss) + priceDiff;
+
+    // Default initial profit/pips is 0 since entry price is calibrated to current price
     let initialPips = 0;
-    if (analysisResult.type === 'BUY') {
-      initialPips = Math.round((parseFloat(currentPrice) - analysisResult.entryPrice) * multiplier);
-    } else if (analysisResult.type === 'SELL') {
-      initialPips = Math.round((analysisResult.entryPrice - parseFloat(currentPrice)) * multiplier);
-    }
 
     const newSignal = {
       id: 'gen-' + Date.now() + '-' + Math.round(Math.random() * 1000),
       pair: analysisResult.pair || pair,
       type: analysisResult.type || 'NEUTRAL',
       style: analysisResult.style || 'SCALP',
-      entryPrice: Number(analysisResult.entryPrice) || Number(currentPrice),
-      currentPrice: Number(currentPrice),
-      takeProfit1: Number(analysisResult.takeProfit1),
-      takeProfit2: Number(analysisResult.takeProfit2),
-      stopLoss: Number(analysisResult.stopLoss),
+      entryPrice: finalEntryPrice,
+      currentPrice: livePriceRightNow,
+      takeProfit1: finalTakeProfit1,
+      takeProfit2: finalTakeProfit2,
+      stopLoss: finalStopLoss,
       confidence: (analysisResult.confidence || 'MEDIUM').toUpperCase() as 'HIGH' | 'MEDIUM' | 'LOW',
       sentiment: analysisResult.sentiment || 'Analisis sentimen pasar terpadu.',
       mtfAnalysis: analysisResult.mtfAnalysis || 'Analisis struktur multi-timeframe terperinci.',
