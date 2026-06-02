@@ -288,6 +288,62 @@ if (geminiApiKey) {
   });
 }
 
+// Helper function to handle transparent Gemini API retries on 503 / high demand errors with exponential backoff and automatic model fallback
+async function generateContentWithRetry(generateFn: (modelName: string) => Promise<any>, maxRetries = 3, initialDelay = 1200) {
+  let attempt = 0;
+  let currentModel = 'gemini-3.5-flash';
+  
+  while (true) {
+    try {
+      return await generateFn(currentModel);
+    } catch (error: any) {
+      attempt++;
+      
+      const errStr = String(error?.message || error).toLowerCase();
+      const isTemporary = 
+        error?.status === 503 || 
+        error?.code === 503 ||
+        error?.status === 'UNAVAILABLE' ||
+        error?.status === 429 ||
+        errStr.includes('503') ||
+        errStr.includes('high demand') ||
+        errStr.includes('unavailable') ||
+        errStr.includes('temporary') ||
+        errStr.includes('overloaded') ||
+        errStr.includes('resource exhausted') ||
+        errStr.includes('429') ||
+        errStr.includes('rate limit');
+
+      if (isTemporary) {
+        // Fall back to the highly available, free gemini-3.1-flash-lite model on the very first failure
+        if (currentModel === 'gemini-3.5-flash') {
+          console.warn(`[Gemini API Warning] Model '${currentModel}' overloaded (503/429). Falling back to highly-available 'gemini-3.1-flash-lite' immediately...`);
+          currentModel = 'gemini-3.1-flash-lite';
+          // Immediately try with fallback model
+          continue;
+        }
+
+        if (attempt < maxRetries) {
+          const delay = initialDelay * Math.pow(2, attempt - 1);
+          console.warn(`[Gemini API Warning] Terjadi error temporer (503/429/UNAVAILABLE) pada model '${currentModel}'. Melakukan percobaan ulang ${attempt}/${maxRetries} dalam ${delay}ms... Details:`, error.message || error);
+          await new Promise(resolve => setTimeout(resolve, delay));
+          continue;
+        }
+      }
+      
+      if (isTemporary) {
+        const customError = new Error(
+          'Model AI Gemini saat ini sedang mengalami lonjakan beban akses yang sangat tinggi di server pusat Google. Silakan tunggu sekitar 5-10 detik lalu klik tombol Analisis/Kirim ulang. (Pesan asli: ' + (error.message || 'Layanan Tidak Tersedia') + ')'
+        );
+        (customError as any).status = 503;
+        throw customError;
+      }
+      
+      throw error;
+    }
+  }
+}
+
 interface ServerSignal {
   id: string;
   pair: string;
@@ -543,8 +599,8 @@ ${customPrompt ? `Konteks atau catatan tambahan pengguna: ${customPrompt}` : ''}
 Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
 
   try {
-    const response = await ai.models.generateContent({
-      model: 'gemini-3.5-flash',
+    const response = await generateContentWithRetry((modelName) => ai!.models.generateContent({
+      model: modelName,
       contents: [
         { text: systemPrompt }
       ],
@@ -572,7 +628,7 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
           ]
         }
       }
-    });
+    }));
 
     const textOutput = response.text || '{}';
     const analysisResult = JSON.parse(textOutput);
@@ -835,10 +891,10 @@ Tulis seluruh evaluasi ulasanmu dalam format Markdown yang elegan dengan bagian-
 ### ⚡ Rekomendasi Taktis & Core Feedback
 (Berikan 2 hingga 3 buah saran perbaikan taktis masa depan yang bersifat operasional dan praktis berdasarkan jurnal ini.)`;
 
-    const response = await activeAi.models.generateContent({
-      model: 'gemini-3.5-flash',
+    const response = await generateContentWithRetry((modelName) => activeAi.models.generateContent({
+      model: modelName,
       contents: [{ text: systemPrompt }],
-    });
+    }));
 
     const reviewText = response.text || 'Gagal menghasilkan ulasan dari AI.';
     return res.json({ success: true, aiReview: reviewText });
