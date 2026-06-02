@@ -22,7 +22,7 @@ app.get('/api/health', (req, res) => {
 
 // --- SERVER-SIDE LIVE PRICES CACHE & FETCH PROXY ---
 const SERVER_SEEDS: Record<string, { price: number; change24h: number }> = {
-  XAUUSD: { price: 4509.00, change24h: 1.17 },
+  XAUUSD: { price: 4483.00, change24h: 1.17 },
   XAGUSD: { price: 77.56, change24h: 2.76 },
   EURUSD: { price: 1.1636, change24h: 0.30 },
   GBPUSD: { price: 1.3475, change24h: 0.41 },
@@ -191,7 +191,7 @@ async function updateRealPricesCache() {
       }
     }
 
-    const finalGold = goldPrice || (cachedPrices['XAUUSD'] ? cachedPrices['XAUUSD'].price : null) || fallbackGold || 4509.00;
+    const finalGold = goldPrice || fallbackGold || (cachedPrices['XAUUSD'] ? cachedPrices['XAUUSD'].price : null) || 4483.00;
     const finalSilver = silverPrice || fallbackSilver || (cachedPrices['XAGUSD'] ? cachedPrices['XAGUSD'].price : 23.5);
 
     setServerCachedPrice('XAUUSD', finalGold, goldChange);

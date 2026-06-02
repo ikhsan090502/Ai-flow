@@ -12,7 +12,7 @@ export function formatAssetPrice(price: number, type: string): number {
 }
 
 const FIXED_SEEDS: Record<string, { price: number; change24h: number }> = {
-  XAUUSD: { price: 4509.00, change24h: 1.17 },
+  XAUUSD: { price: 4483.00, change24h: 1.17 },
   XAGUSD: { price: 77.56, change24h: 2.76 },
   EURUSD: { price: 1.1636, change24h: 0.30 },
   GBPUSD: { price: 1.3475, change24h: 0.41 },
