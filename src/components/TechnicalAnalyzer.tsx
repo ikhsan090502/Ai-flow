@@ -329,8 +329,11 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
                       }}
                       className="w-full bg-slate-900 border border-slate-855 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-600 transition font-mono"
                     >
+                      <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Terbaik & Sangat Logis)</option>
+                      <option value="openai/gpt-4o">GPT-4o ChatGPT (Sangat Populer & Cerdas)</option>
+                      <option value="openai/gpt-4o-mini">GPT-4o Mini ChatGPT (Cepat & Efisien)</option>
+                      <option value="deepseek/deepseek-chat">DeepSeek V3 Chat (Analitis & Cepat)</option>
                       <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B Instruct (Sangat Cerdas)</option>
-                      <option value="deepseek/deepseek-chat">DeepSeek Chat V3 (Analitis & Cepat)</option>
                       <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B Instruct (Trading Strategist)</option>
                       <option value="nvidia/llama-3.1-nemotron-70b-instruct">Llama 3.1 Nemotron 70B (Presisi Sinyal)</option>
                       <option value="google/gemini-2.5-flash">Gemini 2.5 Flash via OpenRouter</option>

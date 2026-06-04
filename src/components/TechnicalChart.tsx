@@ -79,6 +79,7 @@ export default function TechnicalChart({ selectedAsset, prices, onSelectAsset }:
   const containerRef = useRef<HTMLDivElement>(null);
   const svgRef = useRef<SVGSVGElement>(null);
   const [dimensions, setDimensions] = useState({ width: 600, height: 350 });
+  const prevLastCandleTimeRef = useRef<number>(0);
 
   // 1. Handle dimension tracking
   useEffect(() => {
@@ -298,7 +299,11 @@ export default function TechnicalChart({ selectedAsset, prices, onSelectAsset }:
 
     // Latest stroke styling
     const latestPoint = chartData[chartData.length - 1];
-    const lastGain = latestPoint.close >= latestPoint.open;
+    const latestCandleTime = latestPoint ? latestPoint.time.getTime() : 0;
+    const isNewCandleAdded = prevLastCandleTimeRef.current !== latestCandleTime;
+    prevLastCandleTimeRef.current = latestCandleTime;
+
+    const lastGain = latestPoint ? latestPoint.close >= latestPoint.open : true;
     const strokeColor = lastGain ? '#10b981' : '#f43f5e'; // emerald-500 vs rose-500
 
     // Subtle dashed gridlines for analytical styling
@@ -368,35 +373,84 @@ export default function TechnicalChart({ selectedAsset, prices, onSelectAsset }:
       .call(g => g.selectAll('.tick line').remove());
 
     // DRAW THE WICKS
-    g.append('g')
-      .selectAll('line.wick')
+    const wickGroup = g.append('g').attr('class', 'wicks-group');
+    const wicks = wickGroup.selectAll('line.wick')
       .data(chartData)
       .enter()
       .append('line')
-      .attr('class', 'wick')
+      .attr('class', (d: any, i: number) => i === chartData.length - 1 ? 'wick live-wick' : 'wick historic-wick')
       .attr('x1', (d: any) => xScale(d.time))
-      .attr('y1', (d: any) => yScale(d.low))
       .attr('x2', (d: any) => xScale(d.time))
-      .attr('y2', (d: any) => yScale(d.high))
-      .attr('stroke', (d: any) => d.close >= d.open ? '#10b981' : '#f43f5e')
-      .attr('stroke-width', '1.5');
+      .attr('stroke', (d: any, i: number) => {
+        if (i === chartData.length - 1) {
+          return d.close >= d.open ? '#34d399' : '#fb7185'; // Brighter neon for live
+        }
+        return d.close >= d.open ? '#047857' : '#9f1239'; // Matte colors for older
+      })
+      .attr('stroke-width', (d: any, i: number) => i === chartData.length - 1 ? '2' : '1');
+
+    if (isNewCandleAdded) {
+      wicks
+        .attr('y1', (d: any, i: number) => i === chartData.length - 1 ? yScale(d.open) : yScale(d.low))
+        .attr('y2', (d: any, i: number) => i === chartData.length - 1 ? yScale(d.open) : yScale(d.high))
+        .attr('opacity', (d: any, i: number) => i === chartData.length - 1 ? 0 : 0.45)
+        .transition()
+        .duration(750)
+        .ease(d3.easeCubicOut)
+        .attr('y1', (d: any) => yScale(d.low))
+        .attr('y2', (d: any) => yScale(d.high))
+        .attr('opacity', (d: any, i: number) => i === chartData.length - 1 ? 1 : 0.45);
+    } else {
+      wicks
+        .attr('y1', (d: any) => yScale(d.low))
+        .attr('y2', (d: any) => yScale(d.high))
+        .attr('opacity', (d: any, i: number) => i === chartData.length - 1 ? 1 : 0.45);
+    }
 
     // DRAW THE BODIES
     const candleWidth = Math.max(3, (width / chartData.length) * 0.65);
-    g.append('g')
-      .selectAll('rect.candle')
+    const candleGroup = g.append('g').attr('class', 'candles-group');
+    
+    const candles = candleGroup.selectAll('rect.candle')
       .data(chartData)
       .enter()
       .append('rect')
-      .attr('class', 'candle')
-      .attr('x', (d: any) => xScale(d.time) - candleWidth / 2)
-      .attr('y', (d: any) => yScale(Math.max(d.open, d.close)))
+      .attr('class', (d: any, i: number) => i === chartData.length - 1 ? 'candle live-candle' : 'candle historic-candle')
       .attr('width', candleWidth)
-      .attr('height', (d: any) => Math.max(1.5, Math.abs(yScale(d.open) - yScale(d.close))))
-      .attr('fill', (d: any) => d.close >= d.open ? '#10b981' : '#f43f5e')
-      .attr('stroke', (d: any) => d.close >= d.open ? '#059669' : '#b91c1c')
-      .attr('stroke-width', '0.5')
-      .attr('rx', '1');
+      .attr('rx', '1.5')
+      .attr('stroke-width', (d: any, i: number) => i === chartData.length - 1 ? '1' : '0.5')
+      .attr('stroke', (d: any, i: number) => {
+        if (i === chartData.length - 1) {
+          return d.close >= d.open ? '#34d399' : '#fb7185';
+        }
+        return d.close >= d.open ? '#047857' : '#9f1239';
+      })
+      .attr('fill', (d: any, i: number) => {
+        if (i === chartData.length - 1) {
+          return d.close >= d.open ? '#10b981' : '#f43f5e';
+        }
+        return d.close >= d.open ? '#065f46' : '#881337'; // Shaded historic candles
+      });
+
+    if (isNewCandleAdded) {
+      candles
+        .attr('x', (d: any) => xScale(d.time) - candleWidth / 2)
+        .attr('y', (d: any, i: number) => i === chartData.length - 1 ? yScale(d.open) : yScale(Math.max(d.open, d.close)))
+        .attr('height', (d: any, i: number) => i === chartData.length - 1 ? 0 : Math.max(1.5, Math.abs(yScale(d.open) - yScale(d.close))))
+        .attr('opacity', (d: any, i: number) => i === chartData.length - 1 ? 0 : 0.7)
+        .transition()
+        .duration(800)
+        .ease(d3.easeCubicOut)
+        .attr('y', (d: any) => yScale(Math.max(d.open, d.close)))
+        .attr('height', (d: any) => Math.max(1.5, Math.abs(yScale(d.open) - yScale(d.close))))
+        .attr('opacity', (d: any, i: number) => i === chartData.length - 1 ? 1 : 0.7);
+    } else {
+      candles
+        .attr('x', (d: any) => xScale(d.time) - candleWidth / 2)
+        .attr('y', (d: any) => yScale(Math.max(d.open, d.close)))
+        .attr('height', (d: any) => Math.max(1.5, Math.abs(yScale(d.open) - yScale(d.close))))
+        .attr('opacity', (d: any, i: number) => i === chartData.length - 1 ? 1 : 0.7);
+    }
 
     // Render Dashboard style current price glowing tracking lines across the chart
     const latestY = yScale(latestPoint.close);
