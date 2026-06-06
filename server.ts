@@ -84,7 +84,9 @@ let massiveAPI: MassiveAPI | null = null;
 
 if (massiveApiKey) {
   massiveAPI = new MassiveAPI(massiveApiKey);
-  console.log('✅ Massive API initialized with key');
+  console.log('⚠️ Massive API key configured but disabled (endpoint issue)');
+  console.log('📌 Using Binance + Yahoo Finance as primary sources');
+  massiveAPI = null; // Temporarily disable until endpoint is fixed
 } else {
   console.warn('⚠️ MASSIVE_API_KEY not configured, using fallback sources');
 }
@@ -364,61 +366,20 @@ function setServerCachedPrice(symbol: string, price: number, change: number) {
   };
 }
 
-// Background auto updater - with Massive API priority
+// Background auto updater - Binance + Yahoo (Massive temporarily disabled)
 // Strategy:
-// Every 12s: Call 1 - Massive API (XAUUSD + Forex)
-// Every 24s: Call 2 - Massive API (Crypto)
-// Every 36s: Call 3 - Massive API (Saham)
-// Every 12s: Binance crypto WebSocket (background)
+// Every 2s: Binance crypto (most reliable)
+// Every 4s: Yahoo Finance (Gold, Forex, Stocks)
 let updateCounter = 0;
 setInterval(async () => {
   try {
     updateCounter++;
 
-    // Massive API calls (respect 5 calls/minute limit)
-    if (massiveAPI && !massiveAPI.isRateLimited()) {
-      // Every 12 seconds - fetch different asset classes
-      if (updateCounter % 1 === 0) {
-        // Priority: XAUUSD + Forex
-        const forexSymbols = ['XAUUSD', 'EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY'];
-        const forexPrices = await massiveAPI.fetchPrices(forexSymbols);
-        Object.entries(forexPrices).forEach(([symbol, data]: [string, any]) => {
-          if (data.price > 0) {
-            setServerCachedPrice(symbol, data.price, data.change24h || 0);
-          }
-        });
-      }
+    // MOST FREQUENT: Binance crypto (every 2s = every interval)
+    await updateBinancePrices();
 
-      // Every 24 seconds - fetch crypto
-      if (updateCounter % 2 === 0) {
-        const cryptoSymbols = ['BTC', 'ETH', 'SOL', 'XRP'];
-        const cryptoPrices = await massiveAPI.fetchPrices(cryptoSymbols);
-        Object.entries(cryptoPrices).forEach(([symbol, data]: [string, any]) => {
-          if (data.price > 0) {
-            setServerCachedPrice(symbol, data.price, data.change24h || 0);
-          }
-        });
-      }
-
-      // Every 36 seconds - fetch Indonesian stocks
-      if (updateCounter % 3 === 0) {
-        const sahamSymbols = ['BBCA', 'BBRI', 'TLKM', 'ASII'];
-        const sahamPrices = await massiveAPI.fetchPrices(sahamSymbols);
-        Object.entries(sahamPrices).forEach(([symbol, data]: [string, any]) => {
-          if (data.price > 0) {
-            setServerCachedPrice(symbol, data.price, data.change24h || 0);
-          }
-        });
-      }
-    }
-
-    // Binance crypto updates (supplement, every 2s)
-    if (updateCounter % 1 === 0) {
-      await updateBinancePrices();
-    }
-
-    // Yahoo fallback updates (every 5s)
-    if (updateCounter % 3 === 0) {
+    // FREQUENT: Yahoo Finance (every 4s = every 2 intervals)
+    if (updateCounter % 2 === 0) {
       await updateRealPricesCache();
     }
 
