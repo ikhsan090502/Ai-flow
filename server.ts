@@ -2,6 +2,8 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
+import { createServer as createHttpServer } from 'http';
+import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
 import { SUPPORTED_ASSETS } from './src/assetsList';
 
@@ -948,8 +950,60 @@ async function startServer() {
     });
   }
 
-  app.listen(PORT, '0.0.0.0', () => {
-    console.log(`AI Flow AI Flow backend initialized on port ${PORT}`);
+  // Create HTTP server with WebSocket support
+  const httpServer = createHttpServer(app);
+
+  // Setup WebSocket server for real-time price streaming
+  const wsServer = new WebSocketServer({ server: httpServer });
+  const connectedClients = new Set();
+
+  wsServer.on('connection', (ws) => {
+    console.log('✅ Client connected to price stream');
+    connectedClients.add(ws);
+
+    // Send initial prices
+    ws.send(JSON.stringify({
+      type: 'initial',
+      prices: cachedPrices,
+      timestamp: Date.now()
+    }));
+
+    ws.on('close', () => {
+      connectedClients.delete(ws);
+      console.log('Client disconnected from price stream');
+    });
+
+    ws.on('error', (error) => {
+      console.error('WebSocket error:', error);
+      connectedClients.delete(ws);
+    });
+  });
+
+  // Broadcast prices to all connected WebSocket clients every 500ms
+  setInterval(() => {
+    if (connectedClients.size > 0) {
+      const priceData = JSON.stringify({
+        type: 'update',
+        prices: cachedPrices,
+        timestamp: Date.now()
+      });
+
+      connectedClients.forEach((ws) => {
+        if (ws.readyState === 1) { // WebSocket.OPEN
+          try {
+            ws.send(priceData);
+          } catch (error) {
+            console.error('Error broadcasting to client:', error);
+            connectedClients.delete(ws);
+          }
+        }
+      });
+    }
+  }, 500);
+
+  httpServer.listen(PORT, '0.0.0.0', () => {
+    console.log(`✅ AI Flow backend initialized on port ${PORT}`);
+    console.log(`📡 WebSocket streaming ready at wss://localhost:${PORT}/`);
   });
 }
 
