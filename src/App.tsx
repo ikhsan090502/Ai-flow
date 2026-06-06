@@ -44,7 +44,7 @@ export default function App() {
   // Screen active alert floating toasts
   const [toasts, setToasts] = useState<{ id: string; symbol: string; targetPrice: number; currentPrice: number; condition: 'ABOVE' | 'BELOW' }[]>([]);
 
-  // Periodically fetch and simulate micro-price ticks, while running free high-speed Binance WebSocket streaming
+  // Real-time WebSocket price streaming - NO polling, pure WebSocket
   useEffect(() => {
     async function initFeed() {
       setPricesLoading(true);
@@ -52,23 +52,69 @@ export default function App() {
       setPrices(initial);
       setPricesLoading(false);
     }
-    
+
     initFeed();
 
-    // 1. Fetch real API rates every 12 seconds
-    const apiInterval = setInterval(async () => {
-      const updated = await getLivePrices();
-      setPrices(prev => {
-        // Keep WebSocket prices if they are fresher than the slow polled data
-        const merged = { ...updated };
-        Object.keys(prev).forEach(key => {
-          if (prev[key].lastUpdated > (merged[key]?.lastUpdated || 0) + 1000) {
-            merged[key] = prev[key];
+    // Connect to real-time WebSocket price stream (500ms updates)
+    let ws: WebSocket | null = null;
+
+    try {
+      const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+      ws = new WebSocket(`${protocol}//${window.location.host}/api/prices/stream`);
+
+      ws.onmessage = (event) => {
+        try {
+          const data = JSON.parse(event.data);
+          if (data.prices) {
+            setPrices(prev => ({
+              ...prev,
+              ...data.prices
+            }));
           }
+        } catch (e) {
+          console.error('WebSocket parse error:', e);
+        }
+      };
+
+      ws.onerror = (error) => {
+        console.error('WebSocket error, falling back to polling:', error);
+        // Fallback to polling if WebSocket fails
+        const pollInterval = setInterval(async () => {
+          const updated = await getLivePrices();
+          setPrices(prev => {
+            const merged = { ...updated };
+            Object.keys(prev).forEach(key => {
+              if (prev[key].lastUpdated > (merged[key]?.lastUpdated || 0) + 1000) {
+                merged[key] = prev[key];
+              }
+            });
+            return merged;
+          });
+        }, 2000);
+
+        return () => clearInterval(pollInterval);
+      };
+    } catch (e) {
+      console.error('WebSocket setup failed:', e);
+    }
+
+    // Fallback: Fetch real API rates every 15 seconds if WebSocket fails
+    const apiInterval = setInterval(async () => {
+      try {
+        const updated = await getLivePrices();
+        setPrices(prev => {
+          const merged = { ...updated };
+          Object.keys(prev).forEach(key => {
+            if (prev[key].lastUpdated > (merged[key]?.lastUpdated || 0) + 1000) {
+              merged[key] = prev[key];
+            }
+          });
+          return merged;
         });
-        return merged;
-      });
-    }, 12000);
+      } catch (e) {
+        console.error('Fallback API fetch error:', e);
+      }
+    }, 15000);
 
     // 2. Perform ultra-high-speed (350ms) micro price ticks for Gold & Forex to simulate live market depth wiggles
     const fastTickInterval = setInterval(() => {
@@ -195,6 +241,12 @@ export default function App() {
     connect();
 
     return () => {
+      // Cleanup WebSocket
+      if (ws) {
+        ws.close();
+      }
+
+      // Cleanup intervals
       clearInterval(apiInterval);
       clearInterval(fastTickInterval);
       clearInterval(stockTickInterval);
