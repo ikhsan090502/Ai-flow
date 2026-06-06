@@ -197,18 +197,21 @@ async function updateBinancePrices() {
   }
 }
 
-// Finnhub REST API Polling - Guaranteed price updates (backup)
+// Finnhub REST API Polling - Optimized for rate limits
+// Finnhub free tier: 60 calls/minute = 1 call per second max
 async function updateFinnhubRestPrices() {
   if (!finnhubApiKey) return;
 
   try {
+    // OPTIMIZED: Only poll TOP 8 hot symbols to stay within rate limit
+    // Free tier: 60 API calls/minute
+    // 8 symbols every 8 seconds = 7.5 calls/min (safe!)
     const symbols = [
-      'EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY', 'USDCAD', 'USDCHF',
-      'BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD',
-      'BBCA', 'BBRI', 'TLKM', 'ASII',
-      'XAUUSD'
+      'EURUSD', 'GBPUSD', 'BTCUSD', 'ETHUSD',
+      'XAUUSD', 'BBCA', 'BBRI', 'TLKM'
     ];
 
+    let callCount = 0;
     for (const symbol of symbols) {
       try {
         const response = await fetch(
@@ -220,14 +223,22 @@ async function updateFinnhubRestPrices() {
           if (data.c && data.c > 0) {
             const change = data.pc ? ((data.c - data.pc) / data.pc * 100) : 0;
             setServerCachedPrice(symbol, data.c, change);
+            callCount++;
+            console.log(`✅ Finnhub REST: ${symbol} = ${data.c}`);
           }
+        } else {
+          console.debug(`Finnhub REST ${response.status}: ${symbol}`);
         }
       } catch (e) {
-        console.debug(`Finnhub REST error for ${symbol}`);
+        console.debug(`Finnhub REST error for ${symbol}:`, (e as any).message);
       }
 
-      // Small delay to avoid rate limiting
-      await new Promise(resolve => setTimeout(resolve, 50));
+      // Delay between requests to spread load
+      await new Promise(resolve => setTimeout(resolve, 100));
+    }
+
+    if (callCount > 0) {
+      console.log(`📊 Finnhub REST: Updated ${callCount}/${symbols.length} symbols`);
     }
   } catch (error) {
     console.debug('Finnhub REST polling error:', error);
@@ -413,8 +424,8 @@ setInterval(async () => {
     // MOST FREQUENT: Binance crypto (every 2s = every interval)
     await updateBinancePrices();
 
-    // Finnhub REST polling (every 5s = guaranteed updates)
-    if (updateCounter % 2 === 0) {
+    // Finnhub REST polling (every 8s = respect rate limit)
+    if (updateCounter % 4 === 0) {
       await updateFinnhubRestPrices();
     }
 
