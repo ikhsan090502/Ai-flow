@@ -197,6 +197,43 @@ async function updateBinancePrices() {
   }
 }
 
+// Finnhub REST API Polling - Guaranteed price updates (backup)
+async function updateFinnhubRestPrices() {
+  if (!finnhubApiKey) return;
+
+  try {
+    const symbols = [
+      'EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY', 'USDCAD', 'USDCHF',
+      'BTCUSD', 'ETHUSD', 'SOLUSD', 'XRPUSD',
+      'BBCA', 'BBRI', 'TLKM', 'ASII',
+      'XAUUSD'
+    ];
+
+    for (const symbol of symbols) {
+      try {
+        const response = await fetch(
+          `https://finnhub.io/api/v1/quote?symbol=${symbol}&token=${finnhubApiKey}`
+        );
+
+        if (response.ok) {
+          const data = await response.json();
+          if (data.c && data.c > 0) {
+            const change = data.pc ? ((data.c - data.pc) / data.pc * 100) : 0;
+            setServerCachedPrice(symbol, data.c, change);
+          }
+        }
+      } catch (e) {
+        console.debug(`Finnhub REST error for ${symbol}`);
+      }
+
+      // Small delay to avoid rate limiting
+      await new Promise(resolve => setTimeout(resolve, 50));
+    }
+  } catch (error) {
+    console.debug('Finnhub REST polling error:', error);
+  }
+}
+
 async function updateRealPricesCache() {
   const now = Date.now();
   if (now - lastFetchTime < FETCH_THROTTLE_MS) {
@@ -375,6 +412,11 @@ setInterval(async () => {
 
     // MOST FREQUENT: Binance crypto (every 2s = every interval)
     await updateBinancePrices();
+
+    // Finnhub REST polling (every 5s = guaranteed updates)
+    if (updateCounter % 2 === 0) {
+      await updateFinnhubRestPrices();
+    }
 
     // FREQUENT: Yahoo Finance (every 4s = every 2 intervals)
     if (updateCounter % 2 === 0) {
