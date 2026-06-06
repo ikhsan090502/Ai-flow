@@ -85,22 +85,24 @@ export default function App() {
       });
     }, 350);
 
-    // 2b. Perform normal-speed (1500ms) micro price ticks for domestic Indonesian stocks
+    // 2b. REAL-TIME Indonesian stocks (BBCA, BBRI, TLKM, etc) - 600ms ultra-fast tick
     const stockTickInterval = setInterval(() => {
       const ticked = tickLivePrices();
       setPrices(prev => {
         const merged = { ...prev };
         Object.keys(ticked).forEach(key => {
-          const isGoldOrForex = key === 'XAUUSD' || key === 'XAGUSD' || 
+          const isGoldOrForex = key === 'XAUUSD' || key === 'XAGUSD' ||
             ['EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY', 'USDCAD', 'USDCHF'].includes(key);
           const isFromWs = key.includes('USDT') && prev[key]?.lastUpdated && (Date.now() - prev[key].lastUpdated < 8000);
-          if (!isFromWs && !isGoldOrForex) {
+          // Update Indonesian stocks REAL-TIME: BBCA, BBRI, TLKM, ASII, GOTO, BMRI
+          const isIndoStock = ['BBCA', 'BBRI', 'TLKM', 'ASII', 'GOTO', 'BMRI'].includes(key);
+          if ((isIndoStock || (!isFromWs && !isGoldOrForex)) && !isFromWs) {
             merged[key] = ticked[key];
           }
         });
         return merged;
       });
-    }, 1500);
+    }, 600);
 
     // 3. Establish super fast, direct public client-side WebSocket price monitoring (100% Free)
     const wsStreams = [

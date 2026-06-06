@@ -68,13 +68,23 @@ export default function TradeJournal({ prices }: { prices?: Record<string, { pri
     }
   };
 
+  // Real-time P&L calculation for OPEN trades
   useEffect(() => {
-    if (showAddForm) {
-      fetchLivePriceConfirmation();
-      const interval = setInterval(fetchLivePriceConfirmation, 10000); // refresh every 10s
-      return () => clearInterval(interval);
+    // Always fetch live prices to update P&L in real-time
+    fetchLivePriceConfirmation();
+    const interval = setInterval(fetchLivePriceConfirmation, 1000); // REAL-TIME: refresh every 1s for live P&L
+    return () => clearInterval(interval);
+  }, []);
+
+  // Calculate real-time P&L for OPEN trades
+  const calculateLivePnL = (entry: number, type: 'BUY' | 'SELL', currentPrice: number): number => {
+    if (!entry || !currentPrice) return 0;
+    if (type === 'BUY') {
+      return currentPrice - entry; // profit if price up
+    } else {
+      return entry - currentPrice; // profit if price down
     }
-  }, [showAddForm, pair, useCustomPair, customPair]);
+  };
 
   const handleFillPrice = (target: 'entry' | 'exit') => {
     const activePair = useCustomPair ? customPair.toUpperCase().trim() : pair;
