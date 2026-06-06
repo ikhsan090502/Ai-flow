@@ -612,13 +612,18 @@ STRUKTUR ANALISIS (Tulis semua penjelasan dalam Bahasa Indonesia yang profesiona
 - 'bearishCase': Argumen teknikal & fundamental mengapa harga berpeluang turun, dianalisis spesifik dari perspektif indikator yang dipilih di atas yaitu [ ${(indicators || []).join(', ')} ].
 - 'learningFeedback': Berikan 1-2 kalimat analisis kritis/metakognitif tentang keselarasan indikator terpilih [ ${(indicators || []).join(', ')} ] terhadap gaya trading "${tradingStyle || 'bebas'}" dan parameter instrumen ${pair}.
 
-PERHATIKAN HARGA YANG DIIKUTI:
+📊 DATA OBJEKTIF UNTUK ANALISIS:
 Pasangan aset: ${pair}
 Harga sekarang: ${currentPrice}
-Waktu analisis (Timeframe): ${timeframe || 'M15'}
-Gaya trading yang diminta: ${tradingStyle || 'Bebas / Sesuai Timeframe'}
-Indikator opsional bantuan yang wajib dianalisis: ${(indicators || []).join(', ')}
-${customPrompt ? `Konteks atau catatan tambahan pengguna: ${customPrompt}` : ''}
+Timeframe referensi: ${timeframe || 'M15'} (hanya untuk konteks, keputusan BUY/SELL based on indicators!)
+Indikator utama untuk analisis: ${(indicators || []).join(', ')}
+Gaya trading default: ${tradingStyle || 'DAY TRADE'} (gunakan untuk sizing TP/SL, bukan untuk mempengaruhi direction decision)
+
+⚠️ RULE FINAL: Keputusan type (BUY/SELL/NEUTRAL) adalah PURAMENTE OBJECTIVE berdasarkan indikator.
+User timeframe preference & gaya trading adalah HANYA untuk exit strategy, bukan untuk change signal direction.
+Jika indikator menunjukkan SELL momentum overbought, keluarkan SELL meski user prefer BUY atau scalping - AI lebih tahu.
+
+${customPrompt ? `Catatan pengguna (informasi context, bukan override decision): ${customPrompt}` : ''}
 
 Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
 
