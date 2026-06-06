@@ -273,8 +273,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               >
                 <option value="meta-llama/llama-3.3-70b-instruct">⚡ Llama 3.3 70B (POWERFUL)</option>
                 <option value="meta-llama/llama-3.1-405b-instruct">💎 Llama 3.1 405B (SUPER POWER)</option>
-                <option value="google/gemma-2-27b-it">🎯 Gemma 2 27B IT (FAST)</option>
-                      <option value="qwen/qwen-2.5-7b-instruct:free">Qwen 2.5 7B Instruct (GRATIS/FREE)</option>
+                <option value="mistralai/mistral-7b-instruct">🔥 Mistral 7B (FAST)</option>
               </select>
               <p className="text-[9px] text-slate-400 mt-1.5 font-mono">
                 ✅ Semua model gratis | Real-time live chart analysis
