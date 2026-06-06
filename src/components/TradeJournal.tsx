@@ -1011,7 +1011,7 @@ export default function TradeJournal({ prices }: { prices?: Record<string, { pri
 
                   {/* Copy Button */}
                   <div className="flex justify-between items-center text-[9px] font-mono text-slate-550 text-slate-500 pt-1 select-none">
-                    <span>SISTEM INTEL INTELLIGENCE GEMINI 3.5</span>
+                    <span>SISTEM INTEL INTELLIGENCE CLAUDE API</span>
                     <button
                       onClick={() => {
                         navigator.clipboard.writeText(selectedEntry.aiReview || '');

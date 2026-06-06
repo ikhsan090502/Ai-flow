@@ -2,7 +2,7 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import { GoogleGenAI, Type } from '@google/genai';
+import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { SUPPORTED_ASSETS } from './src/assetsList';
 
@@ -273,72 +273,54 @@ app.get('/api/market/prices', async (req, res) => {
   res.json(cachedPrices);
 });
 
-// Initialize Gemini Client
-const geminiApiKey = process.env.GEMINI_API_KEY || '';
-let ai: GoogleGenAI | null = null;
+// Initialize Claude Client
+const claudeApiKey = process.env.ANTHROPIC_API_KEY || '';
+let ai: Anthropic | null = null;
 
-if (geminiApiKey) {
-  ai = new GoogleGenAI({
-    apiKey: geminiApiKey,
-    httpOptions: {
-      headers: {
-        'User-Agent': 'aistudio-build',
-      },
-    },
+if (claudeApiKey) {
+  ai = new Anthropic({
+    apiKey: claudeApiKey,
   });
 }
 
-// Helper function to handle transparent Gemini API retries on 503 / high demand errors with exponential backoff and automatic model fallback
+// Helper function to handle transparent Claude API retries with exponential backoff
 async function generateContentWithRetry(generateFn: (modelName: string) => Promise<any>, maxRetries = 3, initialDelay = 1200) {
   let attempt = 0;
-  let currentModel = 'gemini-3.5-flash';
-  
+  let currentModel = 'claude-opus-4-8';
+
   while (true) {
     try {
       return await generateFn(currentModel);
     } catch (error: any) {
       attempt++;
-      
+
       const errStr = String(error?.message || error).toLowerCase();
-      const isTemporary = 
-        error?.status === 503 || 
+      const isTemporary =
+        error?.status === 503 ||
         error?.code === 503 ||
         error?.status === 'UNAVAILABLE' ||
         error?.status === 429 ||
         errStr.includes('503') ||
-        errStr.includes('high demand') ||
-        errStr.includes('unavailable') ||
-        errStr.includes('temporary') ||
         errStr.includes('overloaded') ||
-        errStr.includes('resource exhausted') ||
-        errStr.includes('429') ||
-        errStr.includes('rate limit');
+        errStr.includes('unavailable') ||
+        errStr.includes('rate limit') ||
+        errStr.includes('429');
 
-      if (isTemporary) {
-        // Fall back to the highly available, free gemini-3.1-flash-lite model on the very first failure
-        if (currentModel === 'gemini-3.5-flash') {
-          console.warn(`[Gemini API Warning] Model '${currentModel}' overloaded (503/429). Falling back to highly-available 'gemini-3.1-flash-lite' immediately...`);
-          currentModel = 'gemini-3.1-flash-lite';
-          // Immediately try with fallback model
-          continue;
-        }
-
-        if (attempt < maxRetries) {
-          const delay = initialDelay * Math.pow(2, attempt - 1);
-          console.warn(`[Gemini API Warning] Terjadi error temporer (503/429/UNAVAILABLE) pada model '${currentModel}'. Melakukan percobaan ulang ${attempt}/${maxRetries} dalam ${delay}ms... Details:`, error.message || error);
-          await new Promise(resolve => setTimeout(resolve, delay));
-          continue;
-        }
+      if (isTemporary && attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        console.warn(`[Claude API Warning] Terjadi error temporer pada model '${currentModel}'. Melakukan percobaan ulang ${attempt}/${maxRetries} dalam ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
       }
-      
+
       if (isTemporary) {
         const customError = new Error(
-          'Model AI Gemini saat ini sedang mengalami lonjakan beban akses yang sangat tinggi di server pusat Google. Silakan tunggu sekitar 5-10 detik lalu klik tombol Analisis/Kirim ulang. (Pesan asli: ' + (error.message || 'Layanan Tidak Tersedia') + ')'
+          'Claude API saat ini mengalami beban tinggi. Silakan tunggu beberapa detik lalu coba lagi. (Detail: ' + (error.message || 'Service Unavailable') + ')'
         );
         (customError as any).status = 503;
         throw customError;
       }
-      
+
       throw error;
     }
   }
@@ -516,12 +498,12 @@ app.post('/api/analyze', async (req, res) => {
     currentPrice, 
     timeframe, 
     indicators, 
-    customPrompt, 
-    tradingStyle, 
-    pastAnalyses, 
-    compiledMetrics, 
-    aiEngine = 'gemini', 
-    openRouterModel = 'meta-llama/llama-3.3-70b-instruct', 
+    customPrompt,
+    tradingStyle,
+    pastAnalyses,
+    compiledMetrics,
+    aiEngine = 'claude',
+    openRouterModel = 'meta-llama/llama-3.3-70b-instruct',
     openRouterApiKey 
   } = req.body;
 
@@ -623,7 +605,7 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
   try {
     let rawTextOutput = '{}';
 
-    // Check if writing through OpenRouter vs Gemini
+    // Check if writing through OpenRouter vs Claude
     const defaultOpenRouterKey = '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';
     if (aiEngine === 'openrouter' && (openRouterApiKey || process.env.OPENROUTER_API_KEY || defaultOpenRouterKey)) {
       const activeApiKey = openRouterApiKey || process.env.OPENROUTER_API_KEY || defaultOpenRouterKey;
@@ -634,7 +616,7 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
         headers: {
           'Content-Type': 'application/json',
           'Authorization': `Bearer ${activeApiKey}`,
-          'HTTP-Referer': 'https://ai.studio/build',
+          'HTTP-Referer': 'https://futuresmax.ai',
           'X-Title': 'FuturesMax AI Flow'
         },
         body: JSON.stringify({
@@ -661,46 +643,28 @@ Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
       const resData = await openRouterRes.json();
       rawTextOutput = resData.choices?.[0]?.message?.content || '{}';
     } else {
-      // Fallback or explicit Google Gemini Engine
+      // Claude Anthropic API Engine
       if (!ai) {
-        throw new Error('Gemini API Key tidak terkonfigurasi pada server. Silakan beri kunci API OpenRouter atau pasang GEMINI_API_KEY.');
+        throw new Error('ANTHROPIC_API_KEY tidak terkonfigurasi pada server. Silakan pasang kunci API atau gunakan OpenRouter.');
       }
 
-      const response = await generateContentWithRetry((modelName) => ai!.models.generateContent({
-        model: modelName,
-        contents: [
-          { text: systemPrompt }
-        ],
-        config: {
-          responseMimeType: 'application/json',
-          responseSchema: {
-            type: Type.OBJECT,
-            properties: {
-              pair: { type: Type.STRING },
-              type: { type: Type.STRING }, // BUY, SELL, NEUTRAL
-              style: { type: Type.STRING }, // SCALP, DAY TRADE, SWING
-              entryPrice: { type: Type.NUMBER },
-              takeProfit1: { type: Type.NUMBER },
-              takeProfit2: { type: Type.NUMBER },
-              stopLoss: { type: Type.NUMBER },
-              confidence: { type: Type.STRING }, // HIGH, MEDIUM, LOW
-              sentiment: { type: Type.STRING },
-              mtfAnalysis: { type: Type.STRING },
-              bullishCase: { type: Type.STRING },
-              bearishCase: { type: Type.STRING },
-              learningFeedback: { type: Type.STRING }
-            },
-            required: [
-              'pair', 'type', 'style', 'entryPrice', 'takeProfit1', 'takeProfit2', 'stopLoss', 'confidence', 'sentiment', 'mtfAnalysis', 'bullishCase', 'bearishCase', 'learningFeedback'
-            ]
-          }
-        }
-      }));
+      const response = await generateContentWithRetry((modelName) =>
+        ai!.messages.create({
+          model: modelName,
+          max_tokens: 2048,
+          messages: [
+            {
+              role: 'user',
+              content: systemPrompt
+            }
+          ]
+        })
+      );
 
-      rawTextOutput = response.text || '{}';
+      rawTextOutput = response.content?.[0]?.type === 'text' ? response.content[0].text : '{}';
     }
 
-    // Clean potential markdown markdown blocks just in case
+    // Clean potential markdown blocks just in case
     const cleanedTextOutput = rawTextOutput.replace(/```json\s*/ig, '').replace(/```\s*$/ig, '').trim();
     const analysisResult = JSON.parse(cleanedTextOutput);
 
@@ -819,7 +783,7 @@ app.post('/api/telegram/send', async (req, res) => {
 Bearish Skenario:</b>
 <i>${signal.bearishCase}</i>
 
-📱 <i>Generated on Google AI Studio Preview by FuturesMax VIP Room</i>
+📱 <i>Generated by Claude AI (FuturesMax VIP Room)</i>
   `.trim();
 
   try {
@@ -912,7 +876,7 @@ app.post('/api/telegram/send-alert', async (req, res) => {
   }
 });
 
-// POST Review dynamic Trade Journal entry with Gemini API
+// POST Review dynamic Trade Journal entry with Claude API
 app.post('/api/gemini/review-journal', async (req, res) => {
   const { pair, type, entryPrice, exitPrice, status, entryReason, exitReason, pnl, notes } = req.body;
 
@@ -920,21 +884,16 @@ app.post('/api/gemini/review-journal', async (req, res) => {
     return res.status(400).json({ error: 'Pasangan, Tipe, Harga Entry, dan Alasan Masuk wajib diisi.' });
   }
 
-  const activeKey = process.env.GEMINI_API_KEY;
+  const activeKey = process.env.ANTHROPIC_API_KEY;
   if (!activeKey) {
     return res.status(500).json({
-      error: 'Gemini API Key belum terkonfigurasi. Silakan tambahkan GEMINI_API_KEY di Settings > Secrets.'
+      error: 'ANTHROPIC_API_KEY belum terkonfigurasi. Silakan tambahkan ANTHROPIC_API_KEY di Settings > Secrets.'
     });
   }
 
   try {
-    const activeAi = new GoogleGenAI({
+    const activeAi = new Anthropic({
       apiKey: activeKey,
-      httpOptions: {
-        headers: {
-          'User-Agent': 'aistudio-build',
-        },
-      },
     });
 
     const systemPrompt = `Kamu adalah FuturesMax AI, mentor trading profesional elit dan psikolog pasar keuangan.
@@ -961,15 +920,23 @@ Tulis seluruh evaluasi ulasanmu dalam format Markdown yang elegan dengan bagian-
 ### ⚡ Rekomendasi Taktis & Core Feedback
 (Berikan 2 hingga 3 buah saran perbaikan taktis masa depan yang bersifat operasional dan praktis berdasarkan jurnal ini.)`;
 
-    const response = await generateContentWithRetry((modelName) => activeAi.models.generateContent({
-      model: modelName,
-      contents: [{ text: systemPrompt }],
-    }));
+    const response = await generateContentWithRetry((modelName) =>
+      activeAi.messages.create({
+        model: modelName,
+        max_tokens: 2048,
+        messages: [
+          {
+            role: 'user',
+            content: systemPrompt
+          }
+        ]
+      })
+    );
 
-    const reviewText = response.text || 'Gagal menghasilkan ulasan dari AI.';
+    const reviewText = response.content?.[0]?.type === 'text' ? response.content[0].text : 'Gagal menghasilkan ulasan dari AI.';
     return res.json({ success: true, aiReview: reviewText });
   } catch (error: any) {
-    console.error('Gemini Trade Journal Review error:', error);
+    console.error('Claude Trade Journal Review error:', error);
     return res.status(500).json({ error: error.message || 'Gagal menghasilkan tinjauan post-trade dari AI.' });
   }
 });

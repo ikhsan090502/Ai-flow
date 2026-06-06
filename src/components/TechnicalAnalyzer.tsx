@@ -27,8 +27,8 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
   const [indicators, setIndicators] = useState<string[]>(['EMA-50', 'Orderblock / SMC', 'RSI']);
   
   // Custom AI Engine settings
-  const [aiEngine, setAiEngine] = useState<'gemini' | 'openrouter'>(() => {
-    return (localStorage.getItem('fm_ai_engine') as any) || 'openrouter';
+  const [aiEngine, setAiEngine] = useState<'claude' | 'openrouter'>(() => {
+    return (localStorage.getItem('fm_ai_engine') as any) || 'claude';
   });
   const [openRouterApiKey, setOpenRouterApiKey] = useState(() => {
     return localStorage.getItem('fm_openrouter_api_key') || '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';
@@ -242,7 +242,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
             <div>
               <h2 className="text-sm font-mono font-bold text-white tracking-wider uppercase">FUTURESMAX COGNITIVE ENGINE</h2>
               <p className="text-[10px] text-slate-500 font-mono uppercase">
-                {aiEngine === 'gemini' ? 'GOOGLE GEMINI NATIVE ENGINE' : `OPENROUTER: ${openRouterModel.split('/').pop()}`}
+                {aiEngine === 'claude' ? 'CLAUDE API (Anthropic)' : `OPENROUTER: ${openRouterModel.split('/').pop()}`}
               </p>
             </div>
           </div>
@@ -276,16 +276,16 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
                   <button
                     type="button"
                     onClick={() => {
-                      setAiEngine('gemini');
-                      localStorage.setItem('fm_ai_engine', 'gemini');
+                      setAiEngine('claude');
+                      localStorage.setItem('fm_ai_engine', 'claude');
                     }}
                     className={`px-3 py-2 rounded-lg text-xs font-mono font-bold text-center border transition ${
-                      aiEngine === 'gemini'
+                      aiEngine === 'claude'
                         ? 'bg-emerald-950/70 text-emerald-400 border-emerald-800'
                         : 'bg-slate-900/60 text-slate-500 border-slate-850 hover:bg-slate-900 hover:text-slate-300'
                     }`}
                   >
-                    🚀 Gemini Native
+                    🚀 Claude API
                   </button>
                   <button
                     type="button"
@@ -305,17 +305,17 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               </div>
 
               <div>
-                {aiEngine === 'gemini' ? (
+                {aiEngine === 'claude' ? (
                   <div>
-                    <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5">MODEL GEMINI UTAMA</label>
+                    <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5">MODEL CLAUDE UTAMA</label>
                     <select
                       disabled
                       className="w-full bg-slate-900 border border-slate-850 rounded-lg px-3 py-2 text-xs text-slate-500 cursor-not-allowed font-mono outline-none"
                     >
-                      <option>gemini-3.5-flash / gemini-3.1-flash-lite (Auto Fallback)</option>
+                      <option>claude-opus-4-8 (Latest)</option>
                     </select>
                     <p className="text-[10px] text-slate-500 mt-1.5 font-mono">
-                      * Menggunakan server-side endpoint VIP dengan skema re-routing otomatis jika terjadi over-capacity.
+                      * Menggunakan Claude API dengan intelligent processing untuk analisis chart real-time yang akurat.
                     </p>
                   </div>
                 ) : (
@@ -758,7 +758,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
           <div className="pl-4 space-y-1">
             <p>✔ Membaca feed harga live {pair} di bursa...</p>
             <p>✔ Menyerap indikator terbaca: {indicators.join(', ')}...</p>
-            <p>✔ Memproses sirkuit model {aiEngine === 'gemini' ? 'gemini-3.5-flash' : openRouterModel.split('/').pop()}...</p>
+            <p>✔ Memproses sirkuit model {aiEngine === 'claude' ? 'claude-opus-4-8' : openRouterModel.split('/').pop()}...</p>
             <p className="text-slate-600">⌛ Mengenal pola Quasimodo dan supply & demand harian...</p>
           </div>
         </div>
@@ -792,7 +792,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase">
-                  Hasil Kognisi {aiEngine === 'gemini' ? 'Gemini Native' : openRouterModel.split('/').pop()}
+                  Hasil Kognisi {aiEngine === 'claude' ? 'Claude API' : openRouterModel.split('/').pop()}
                 </p>
               </div>
 
@@ -957,7 +957,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               <div className="space-y-0.5">
                 <span className="text-slate-500 block uppercase text-[10px]">Model Utama</span>
                 <span className="text-slate-200 font-bold block truncate max-w-[120px]">
-                  {aiEngine === 'gemini' ? 'Gemini 3.5' : openRouterModel.split('/').pop()}
+                  {aiEngine === 'claude' ? 'Claude Opus' : openRouterModel.split('/').pop()}
                 </span>
               </div>
               <div className="space-y-0.5">
