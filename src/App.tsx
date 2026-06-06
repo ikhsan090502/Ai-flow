@@ -60,61 +60,69 @@ export default function App() {
 
     try {
       const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
-      ws = new WebSocket(`${protocol}//${window.location.host}/api/prices/stream`);
+      // Connect to WebSocket server (any path works, server accepts all upgrades)
+      ws = new WebSocket(`${protocol}//${window.location.host}/`);
+
+      ws.onopen = () => {
+        console.log('✅ WebSocket connected - receiving real-time prices');
+        setIsWsConnected(true);
+      };
 
       ws.onmessage = (event) => {
         try {
           const data = JSON.parse(event.data);
-          if (data.prices) {
-            setPrices(prev => ({
-              ...prev,
-              ...data.prices
-            }));
+          // Server sends { type, prices, timestamp }
+          if (data.prices && typeof data.prices === 'object') {
+            setPrices(prev => {
+              const updated = { ...prev };
+              Object.entries(data.prices).forEach(([symbol, priceData]: [string, any]) => {
+                if (priceData && typeof priceData === 'object') {
+                  updated[symbol] = priceData;
+                }
+              });
+              return updated;
+            });
+            setIsWsConnected(true);
           }
         } catch (e) {
-          console.error('WebSocket parse error:', e);
+          console.debug('WebSocket parse error:', e);
         }
       };
 
       ws.onerror = (error) => {
-        console.error('WebSocket error, falling back to polling:', error);
-        // Fallback to polling if WebSocket fails
-        const pollInterval = setInterval(async () => {
+        console.error('❌ WebSocket error:', error);
+        setIsWsConnected(false);
+      };
+
+      ws.onclose = () => {
+        console.log('WebSocket disconnected, using polling fallback');
+        setIsWsConnected(false);
+      };
+    } catch (e) {
+      console.error('WebSocket setup failed:', e);
+      setIsWsConnected(false);
+    }
+
+    // Fallback: Polling every 3 seconds (backup if WebSocket unavailable)
+    const pollInterval = setInterval(async () => {
+      // Only poll if WebSocket is NOT connected (no redundant fetching)
+      if (!isWsConnected) {
+        try {
           const updated = await getLivePrices();
           setPrices(prev => {
             const merged = { ...updated };
             Object.keys(prev).forEach(key => {
-              if (prev[key].lastUpdated > (merged[key]?.lastUpdated || 0) + 1000) {
+              if (prev[key]?.lastUpdated > (merged[key]?.lastUpdated || 0) + 1000) {
                 merged[key] = prev[key];
               }
             });
             return merged;
           });
-        }, 2000);
-
-        return () => clearInterval(pollInterval);
-      };
-    } catch (e) {
-      console.error('WebSocket setup failed:', e);
-    }
-
-    // Fallback: Fetch real API rates every 15 seconds if WebSocket fails
-    const apiInterval = setInterval(async () => {
-      try {
-        const updated = await getLivePrices();
-        setPrices(prev => {
-          const merged = { ...updated };
-          Object.keys(prev).forEach(key => {
-            if (prev[key].lastUpdated > (merged[key]?.lastUpdated || 0) + 1000) {
-              merged[key] = prev[key];
-            }
-          });
-          return merged;
-        });
-      } catch (e) {
-        console.error('Fallback API fetch error:', e);
+        } catch (e) {
+          console.debug('Fallback API fetch error:', e);
+        }
       }
-    }, 15000);
+    }, 3000); // More frequent fallback polling = less gaps
 
     // 2. Perform ultra-high-speed (350ms) micro price ticks for Gold & Forex to simulate live market depth wiggles
     const fastTickInterval = setInterval(() => {
@@ -241,15 +249,17 @@ export default function App() {
     connect();
 
     return () => {
-      // Cleanup WebSocket
-      if (ws) {
+      // Cleanup WebSocket connection
+      if (ws && ws.readyState === WebSocket.OPEN) {
         ws.close();
       }
 
-      // Cleanup intervals
-      clearInterval(apiInterval);
+      // Cleanup all intervals
+      clearInterval(pollInterval);
       clearInterval(fastTickInterval);
       clearInterval(stockTickInterval);
+
+      // Cleanup any existing socket
       if (socket) {
         socket.onclose = null;
         socket.close();
