@@ -494,20 +494,18 @@ let signalsHistory: ServerSignal[] = [
   }
 ];
 
-// POST Analyze with Gemini or OpenRouter API
+// POST Analyze with OpenRouter API
 app.post('/api/analyze', async (req, res) => {
-  const { 
-    pair, 
-    currentPrice, 
-    timeframe, 
-    indicators, 
+  const {
+    pair,
+    currentPrice,
+    timeframe,
+    indicators,
     customPrompt,
     tradingStyle,
     pastAnalyses,
     compiledMetrics,
-    aiEngine = 'claude',
-    openRouterModel = 'meta-llama/llama-3.3-70b-instruct',
-    openRouterApiKey 
+    openRouterModel = 'meta-llama/llama-3.3-70b-instruct'
   } = req.body;
 
   if (!pair || !currentPrice) {
@@ -824,7 +822,7 @@ app.post('/api/telegram/send-alert', async (req, res) => {
 });
 
 // POST Review dynamic Trade Journal entry with OpenRouter API
-app.post('/api/gemini/review-journal', async (req, res) => {
+app.post('/api/ai-flow/review-journal', async (req, res) => {
   const { pair, type, entryPrice, exitPrice, status, entryReason, exitReason, pnl, notes } = req.body;
 
   if (!pair || !type || !entryPrice || !entryReason) {

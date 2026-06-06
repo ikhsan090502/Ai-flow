@@ -256,7 +256,7 @@ export default function TradeJournal({ prices }: { prices?: Record<string, { pri
     setAiError(null);
     
     try {
-      const response = await fetch('/api/gemini/review-journal', {
+      const response = await fetch('/api/ai-flow/review-journal', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({

@@ -44,7 +44,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
 
   // Load history from localStorage on startup
   useEffect(() => {
-    const saved = localStorage.getItem('futuresmax_analysis_history');
+    const saved = localStorage.getItem('ai_flow_history');
     if (saved) {
       try {
         setHistoryLogs(JSON.parse(saved));
@@ -174,7 +174,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
       // Save to localStorage so that history is stored as cumulative AI context learning
       const updatedHistory = [signal, ...historyLogs];
       setHistoryLogs(updatedHistory);
-      localStorage.setItem('futuresmax_analysis_history', JSON.stringify(updatedHistory));
+      localStorage.setItem('ai_flow_history', JSON.stringify(updatedHistory));
 
       onSignalGenerated(signal);
 
@@ -703,7 +703,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase">
-                  Hasil Kognisi {openRouterModel === 'claude' ? 'Claude API' : openRouterModel.split('/').pop()}
+                  Hasil Kognisi {openRouterModel.split('/').pop()}
                 </p>
               </div>
 
@@ -840,7 +840,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
             <button
               onClick={() => {
                 if(window.confirm("Hapus semua riwayat analisis & memori kognitif lokal?")) {
-                  localStorage.removeItem('futuresmax_analysis_history');
+                  localStorage.removeItem('ai_flow_history');
                   setHistoryLogs([]);
                 }
               }}
@@ -868,7 +868,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               <div className="space-y-0.5">
                 <span className="text-slate-500 block uppercase text-[10px]">Model Utama</span>
                 <span className="text-slate-200 font-bold block truncate max-w-[120px]">
-                  {openRouterModel === 'claude' ? 'Claude Opus' : openRouterModel.split('/').pop()}
+                  {openRouterModel.split('/').pop()}
                 </span>
               </div>
               <div className="space-y-0.5">
