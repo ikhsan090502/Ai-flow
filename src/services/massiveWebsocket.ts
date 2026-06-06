@@ -82,24 +82,17 @@ class MassiveWebSocketClient {
     console.log(`📊 Subscribed to ${symbol}`);
   }
 
-  onPrice(symbol: string, handler: (price: number, bid: number, ask: number) => void): void {
+  onPrice(symbol: string, handler: (data: any) => void): void {
     this.messageHandlers.set(symbol, handler);
   }
 
   private handleMessage(data: any): void {
     // Parse Massive WebSocket message format
-    if (data.type === 'tick') {
+    if (data.type === 'tick' || data.type === 'aggregate') {
       const symbol = data.symbol;
       const handler = this.messageHandlers.get(symbol);
       if (handler) {
-        handler(data.last || data.price, data.bid, data.ask);
-      }
-    } else if (data.type === 'aggregate') {
-      // Handle minute/hour aggregates
-      const symbol = data.symbol;
-      const handler = this.messageHandlers.get(symbol);
-      if (handler) {
-        handler(data.c || data.close, data.o, data.h); // close, open, high
+        handler(data);
       }
     }
   }
