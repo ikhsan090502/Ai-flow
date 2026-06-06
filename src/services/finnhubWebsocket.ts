@@ -74,7 +74,15 @@ class FinnhubWebSocketClient {
   }
 
   private handleMessage(data: any): void {
-    // Finnhub sends { type: 'trade', data: [...] }
+    // Log message types for debugging
+    if (data.type === 'ping') {
+      // Finnhub sends ping, respond with pong
+      if (this.ws && this.ws.readyState === WebSocket.OPEN) {
+        this.ws.send(JSON.stringify({ type: 'pong' }));
+      }
+      return;
+    }
+
     if (data.type === 'trade' && data.data) {
       data.data.forEach((trade: any) => {
         const symbol = trade.s; // symbol
@@ -89,7 +97,21 @@ class FinnhubWebSocketClient {
           });
         }
       });
+    } else if (data.type === 'quote' && data.data) {
+      // Alternative format: quote data
+      const symbol = data.data.s;
+      const handler = this.priceHandlers.get(symbol);
+      if (handler) {
+        handler({
+          symbol,
+          price: data.data.ltp || data.data.p, // last trade price
+          bid: data.data.bp,
+          ask: data.data.ap,
+          timestamp: data.t
+        });
+      }
     }
+    // Silently ignore other message types
   }
 
   private attemptReconnect(): void {
