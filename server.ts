@@ -7,11 +7,87 @@ import { WebSocketServer } from 'ws';
 import dotenv from 'dotenv';
 import { SUPPORTED_ASSETS } from './src/assetsList';
 
+// Massive API Integration - Real-time market data
+class MassiveAPI {
+  private apiKey: string;
+  private baseUrl = 'https://api.massive.com/rest';
+  private callCount = 0;
+  private lastResetTime = Date.now();
+
+  constructor(apiKey: string) {
+    this.apiKey = apiKey;
+  }
+
+  isRateLimited(): boolean {
+    const now = Date.now();
+    if (now - this.lastResetTime > 60000) {
+      this.callCount = 0;
+      this.lastResetTime = now;
+    }
+    return this.callCount >= 5;
+  }
+
+  async fetchPrices(symbols: string[]): Promise<Record<string, any>> {
+    if (this.isRateLimited()) {
+      return {};
+    }
+
+    try {
+      this.callCount++;
+      const response = await fetch(
+        `${this.baseUrl}/quote?symbols=${symbols.join(',')}`,
+        {
+          headers: {
+            'Authorization': `Bearer ${this.apiKey}`,
+            'Content-Type': 'application/json'
+          }
+        }
+      );
+
+      if (!response.ok) {
+        throw new Error(`Massive API error: ${response.statusText}`);
+      }
+
+      const data = await response.json();
+      const prices: Record<string, any> = {};
+
+      if (data.data) {
+        Object.entries(data.data).forEach(([symbol, quote]: [string, any]) => {
+          prices[symbol] = {
+            price: parseFloat(quote.last) || parseFloat(quote.close) || 0,
+            bid: parseFloat(quote.bid) || 0,
+            ask: parseFloat(quote.ask) || 0,
+            change24h: parseFloat(quote.change24h) || 0,
+            lastUpdated: Date.now()
+          };
+        });
+      }
+
+      console.log(`✅ Massive API: Fetched ${Object.keys(prices).length} prices (${this.callCount}/5 calls used)`);
+      return prices;
+    } catch (error) {
+      console.error('Massive API fetch error:', error);
+      return {};
+    }
+  }
+}
+
 // Load environment variables
 dotenv.config();
 
 const app = express();
 const PORT = 3000;
+
+// Initialize Massive API
+const massiveApiKey = process.env.MASSIVE_API_KEY;
+let massiveAPI: MassiveAPI | null = null;
+
+if (massiveApiKey) {
+  massiveAPI = new MassiveAPI(massiveApiKey);
+  console.log('✅ Massive API initialized with key');
+} else {
+  console.warn('⚠️ MASSIVE_API_KEY not configured, using fallback sources');
+}
 
 // Middleware
 app.use(express.json());
@@ -288,21 +364,60 @@ function setServerCachedPrice(symbol: string, price: number, change: number) {
   };
 }
 
-// Background auto updater - smart frequency based on source reliability
-// Crypto (Binance): Every 2s - most reliable
-// Stocks (Yahoo): Every 5s - reliable
-// Gold/Forex (Fallback): Every 8s - less reliable, use cached mostly
+// Background auto updater - with Massive API priority
+// Strategy:
+// Every 12s: Call 1 - Massive API (XAUUSD + Forex)
+// Every 24s: Call 2 - Massive API (Crypto)
+// Every 36s: Call 3 - Massive API (Saham)
+// Every 12s: Binance crypto WebSocket (background)
 let updateCounter = 0;
 setInterval(async () => {
   try {
     updateCounter++;
 
-    // Crypto updates every 2s (most reliable)
+    // Massive API calls (respect 5 calls/minute limit)
+    if (massiveAPI && !massiveAPI.isRateLimited()) {
+      // Every 12 seconds - fetch different asset classes
+      if (updateCounter % 1 === 0) {
+        // Priority: XAUUSD + Forex
+        const forexSymbols = ['XAUUSD', 'EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY'];
+        const forexPrices = await massiveAPI.fetchPrices(forexSymbols);
+        Object.entries(forexPrices).forEach(([symbol, data]: [string, any]) => {
+          if (data.price > 0) {
+            setServerCachedPrice(symbol, data.price, data.change24h || 0);
+          }
+        });
+      }
+
+      // Every 24 seconds - fetch crypto
+      if (updateCounter % 2 === 0) {
+        const cryptoSymbols = ['BTC', 'ETH', 'SOL', 'XRP'];
+        const cryptoPrices = await massiveAPI.fetchPrices(cryptoSymbols);
+        Object.entries(cryptoPrices).forEach(([symbol, data]: [string, any]) => {
+          if (data.price > 0) {
+            setServerCachedPrice(symbol, data.price, data.change24h || 0);
+          }
+        });
+      }
+
+      // Every 36 seconds - fetch Indonesian stocks
+      if (updateCounter % 3 === 0) {
+        const sahamSymbols = ['BBCA', 'BBRI', 'TLKM', 'ASII'];
+        const sahamPrices = await massiveAPI.fetchPrices(sahamSymbols);
+        Object.entries(sahamPrices).forEach(([symbol, data]: [string, any]) => {
+          if (data.price > 0) {
+            setServerCachedPrice(symbol, data.price, data.change24h || 0);
+          }
+        });
+      }
+    }
+
+    // Binance crypto updates (supplement, every 2s)
     if (updateCounter % 1 === 0) {
       await updateBinancePrices();
     }
 
-    // Stock/Forex updates every 5s
+    // Yahoo fallback updates (every 5s)
     if (updateCounter % 3 === 0) {
       await updateRealPricesCache();
     }
