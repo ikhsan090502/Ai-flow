@@ -955,9 +955,9 @@ async function startServer() {
 
   // Setup WebSocket server for real-time price streaming
   const wsServer = new WebSocketServer({ server: httpServer });
-  const connectedClients = new Set();
+  const connectedClients = new Set<any>();
 
-  wsServer.on('connection', (ws) => {
+  wsServer.on('connection', (ws: any) => {
     console.log('✅ Client connected to price stream');
     connectedClients.add(ws);
 
