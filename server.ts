@@ -146,7 +146,7 @@ async function updateRealPricesCache() {
     console.error('ExchangeRate Forex fetch failed on server:', err);
   }
 
-  // 3. Fetch Spot Gold & Silver from metals.live (REAL-TIME COMMODITY API)
+  // 3. Fetch Gold & Silver from MULTIPLE FREE SOURCES with intelligent fallback
   // XAUUSD = Real commodity spot price (USD per troy ounce)
   let goldPrice: number | null = null;
   let silverPrice: number | null = null;
@@ -154,66 +154,83 @@ async function updateRealPricesCache() {
   let silverChange = 0.45;
 
   try {
-    // metals.live = Professional-grade real-time commodity prices
-    // Perfect for XAUUSD (spot gold) - 1-second updates
-    const metalsRes = await fetch('https://api.metals.live/v1/spot/gold').catch(() => null);
-    if (metalsRes?.ok) {
-      const data = await metalsRes.json();
-      // metals.live returns: {id: "gold", price: 4485.50, currency: "USD", timestamp: ...}
-      if (data.price !== undefined) {
-        goldPrice = parseFloat(data.price);
-        console.log(`✅ XAUUSD Real-time Spot Gold from metals.live: $${goldPrice}`);
-      }
-    }
-
-    // Fetch silver from metals.live as well
-    if (!silverPrice) {
-      const silverRes = await fetch('https://api.metals.live/v1/spot/silver').catch(() => null);
-      if (silverRes?.ok) {
-        const data = await silverRes.json();
-        if (data.price !== undefined) {
-          silverPrice = parseFloat(data.price);
-          console.log(`✅ XAGUSD Real-time Spot Silver from metals.live: $${silverPrice}`);
+    // FREE SOURCE 1: Alpha Vantage (Free, no credit card needed)
+    // Real-time XAU/USD currency exchange rate
+    const avRes = await fetch('https://www.alphavantage.co/query?function=CURRENCY_EXCHANGE_RATE&from_symbol=XAU&to_symbol=USD&apikey=demo').catch(() => null);
+    if (avRes?.ok) {
+      const data = await avRes.json();
+      const rate = data['Realtime Currency Exchange Rate'];
+      if (rate && rate['Bid Price']) {
+        const bid = parseFloat(rate['Bid Price']);
+        if (!isNaN(bid) && bid > 100) {
+          goldPrice = bid;
+          console.log(`✅ XAUUSD from Alpha Vantage (FREE): $${goldPrice}`);
         }
       }
     }
 
-    // Fallback: Yahoo Finance for futures prices if metals.live fails
+    // FREE SOURCE 2: Yahoo Finance (Completely free, no API key required)
+    // Gold futures GC=F + Silver futures SI=F as real-time backup
     if (!goldPrice || !silverPrice) {
       const [goldRes, silverRes] = await Promise.all([
-        fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d').catch(() => null),
-        fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=1d').catch(() => null)
+        fetch('https://query1.finance.yahoo.com/v10/finance/quoteSummary/GC=F?modules=price').catch(() => null),
+        fetch('https://query1.finance.yahoo.com/v10/finance/quoteSummary/SI=F?modules=price').catch(() => null)
       ]);
 
-      if (goldRes && goldRes.ok && !goldPrice) {
-        const json = await goldRes.json();
-        const result = json?.chart?.result?.[0];
-        const price = result?.meta?.regularMarketPrice;
-        const prevClose = result?.meta?.chartPreviousClose;
-        if (price !== undefined && price !== null) {
-          goldPrice = price;
-          if (prevClose) {
-            goldChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+      if (goldRes?.ok && !goldPrice) {
+        try {
+          const json = await goldRes.json();
+          const price = json?.quoteSummary?.result?.[0]?.price?.regularMarketPrice;
+          if (price !== undefined && price > 100) {
+            goldPrice = price;
+            console.log(`✅ XAUUSD from Yahoo Finance GC=F (FREE): $${goldPrice}`);
           }
+        } catch (e) {
+          console.debug('Yahoo gold parse error');
         }
       }
 
-      if (silverRes && silverRes.ok && !silverPrice) {
-        const json = await silverRes.json();
-        const result = json?.chart?.result?.[0];
-        const price = result?.meta?.regularMarketPrice;
-        const prevClose = result?.meta?.chartPreviousClose;
-        if (price !== undefined && price !== null) {
-          silverPrice = price;
-          if (prevClose) {
-            silverChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+      if (silverRes?.ok && !silverPrice) {
+        try {
+          const json = await silverRes.json();
+          const price = json?.quoteSummary?.result?.[0]?.price?.regularMarketPrice;
+          if (price !== undefined && price > 0) {
+            silverPrice = price;
+            console.log(`✅ XAGUSD from Yahoo Finance SI=F (FREE): $${silverPrice}`);
           }
+        } catch (e) {
+          console.debug('Yahoo silver parse error');
         }
       }
     }
 
-    const finalGold = goldPrice || fallbackGold || (cachedPrices['XAUUSD'] ? cachedPrices['XAUUSD'].price : null) || 4483.00;
-    const finalSilver = silverPrice || fallbackSilver || (cachedPrices['XAGUSD'] ? cachedPrices['XAGUSD'].price : 23.5);
+    // FREE SOURCE 3: metals.live (Professional backup if above fail)
+    // Real-time spot prices from metal market data
+    if (!goldPrice || !silverPrice) {
+      const [metalsGold, metalsSilver] = await Promise.all([
+        fetch('https://api.metals.live/v1/spot/gold').catch(() => null),
+        fetch('https://api.metals.live/v1/spot/silver').catch(() => null)
+      ]);
+
+      if (metalsGold?.ok && !goldPrice) {
+        const data = await metalsGold.json();
+        if (data.price !== undefined && data.price > 100) {
+          goldPrice = data.price;
+          console.log(`✅ XAUUSD from metals.live (BACKUP): $${goldPrice}`);
+        }
+      }
+
+      if (metalsSilver?.ok && !silverPrice) {
+        const data = await metalsSilver.json();
+        if (data.price !== undefined && data.price > 0) {
+          silverPrice = data.price;
+          console.log(`✅ XAGUSD from metals.live (BACKUP): $${silverPrice}`);
+        }
+      }
+    }
+
+    const finalGold = goldPrice || fallbackGold || (cachedPrices['XAUUSD']?.price) || 4483.00;
+    const finalSilver = silverPrice || fallbackSilver || (cachedPrices['XAGUSD']?.price) || 23.5;
 
     setServerCachedPrice('XAUUSD', finalGold, goldChange);
     setServerCachedPrice('XAGUSD', finalSilver, silverChange);
