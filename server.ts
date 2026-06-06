@@ -78,16 +78,15 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Initialize Massive WebSocket (Real-time streaming)
-const massiveAccessKey = process.env.MASSIVE_ACCESS_KEY_ID;
-const massiveSecretKey = process.env.MASSIVE_SECRET_KEY;
+// Initialize Finnhub WebSocket (Real-time streaming)
+const finnhubApiKey = process.env.FINNHUB_API_KEY;
+let finnhubClient: any = null;
 
-if (massiveAccessKey && massiveSecretKey) {
-  console.log('🔗 Massive WebSocket credentials configured');
-  console.log('⏳ Will initialize WebSocket after server starts...');
+if (finnhubApiKey) {
+  console.log('🔗 Finnhub API key configured');
+  console.log('⏳ Will initialize WebSocket connection after server starts...');
 } else {
-  console.warn('⚠️ Massive WebSocket credentials not found');
-  console.log('📌 Using Binance + Yahoo Finance as fallback');
+  console.warn('⚠️ FINNHUB_API_KEY not found, using Binance + Yahoo fallback');
 }
 
 // Middleware
@@ -1093,9 +1092,42 @@ async function startServer() {
     }
   }, 500);
 
-  httpServer.listen(PORT, '0.0.0.0', () => {
+  httpServer.listen(PORT, '0.0.0.0', async () => {
     console.log(`✅ AI Flow backend initialized on port ${PORT}`);
     console.log(`📡 WebSocket streaming ready at wss://localhost:${PORT}/`);
+
+    // Initialize Finnhub WebSocket connection
+    if (finnhubApiKey) {
+      try {
+        const { FinnhubWebSocketClient } = await import('./src/services/finnhubWebsocket.js');
+        finnhubClient = new FinnhubWebSocketClient(finnhubApiKey);
+
+        await finnhubClient.connect();
+
+        // Subscribe to all symbols we track
+        const symbolsToTrack = [
+          'XAUUSD', 'EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY', 'USDCAD', 'USDCHF',
+          'BTC', 'ETH', 'SOL', 'XRP',
+          'BBCA', 'BBRI', 'TLKM', 'ASII'
+        ];
+
+        symbolsToTrack.forEach(symbol => {
+          finnhubClient.subscribe(symbol);
+
+          // Handle price updates
+          finnhubClient.onPrice(symbol, (data: any) => {
+            if (data.price > 0) {
+              setServerCachedPrice(symbol, data.price, 0);
+            }
+          });
+        });
+
+        console.log('🔗 Finnhub streaming initialized with', symbolsToTrack.length, 'symbols');
+      } catch (error) {
+        console.error('⚠️ Finnhub initialization failed:', error);
+        console.log('📌 Falling back to Binance + Yahoo Finance');
+      }
+    }
   });
 }
 
