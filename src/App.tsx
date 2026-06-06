@@ -10,11 +10,13 @@ import BrokerRecommendations from './components/BrokerRecommendations';
 import MarketSessionsCalendar from './components/MarketSessionsCalendar';
 import TradeJournal from './components/TradeJournal';
 import TechnicalChart from './components/TechnicalChart';
-import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins, Calendar, BellRing, BookMarked, AreaChart } from 'lucide-react';
+import MoneyManagement from './components/MoneyManagement';
+import FedNews from './components/FedNews';
+import { Cpu, BarChart3, Send, ShieldCheck, Zap, RefreshCw, Coins, Calendar, BellRing, BookMarked, AreaChart, DollarSign, TrendingUp } from 'lucide-react';
 import { getLivePrices, tickLivePrices } from './services/marketService';
 
 export default function App() {
-  const [activeTab, setActiveTab] = useState<'analyzer' | 'chart' | 'dashboard' | 'telegram' | 'broker' | 'calendar' | 'journal'>('analyzer');
+  const [activeTab, setActiveTab] = useState<'analyzer' | 'chart' | 'dashboard' | 'telegram' | 'broker' | 'calendar' | 'journal' | 'money' | 'news'>('analyzer');
   const [selectedAsset, setSelectedAsset] = useState<Asset | null>(null);
   const [selectedPrice, setSelectedPrice] = useState<number | null>(null);
   const [signals, setSignals] = useState<MarketSignal[]>([]);
@@ -659,13 +661,37 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
           <button
             onClick={() => setActiveTab('journal')}
             className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
-              activeTab === 'journal' 
-                ? 'bg-slate-800 text-white shadow-sm' 
+              activeTab === 'journal'
+                ? 'bg-slate-800 text-white shadow-sm'
                 : 'text-slate-400 hover:text-white'
             }`}
           >
             <BookMarked size={14} />
             <span>Jurnal & Review AI</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('money')}
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+              activeTab === 'money'
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <DollarSign size={14} />
+            <span>Money Mgmt</span>
+          </button>
+
+          <button
+            onClick={() => setActiveTab('news')}
+            className={`flex-1 md:flex-none flex items-center justify-center space-x-1.5 px-3.5 py-2 rounded-lg font-mono text-xs font-bold uppercase transition ${
+              activeTab === 'news'
+                ? 'bg-slate-800 text-white shadow-sm'
+                : 'text-slate-400 hover:text-white'
+            }`}
+          >
+            <TrendingUp size={14} />
+            <span>Fed News</span>
           </button>
         </div>
       </header>
@@ -744,6 +770,14 @@ ${condEmoji} <b>Kondisi Trigger:</b> <b>${alert.condition} TEMBUS</b> (Target: $
 
           {activeTab === 'journal' && (
             <TradeJournal prices={prices} />
+          )}
+
+          {activeTab === 'money' && (
+            <MoneyManagement />
+          )}
+
+          {activeTab === 'news' && (
+            <FedNews />
           )}
         </section>
       </main>
