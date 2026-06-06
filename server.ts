@@ -556,12 +556,27 @@ Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan para
 🎯 ATURAN MUTLAK INDIKATOR TERPILIH (PENTINGNYA INTEGRASI INDIKATOR SISTEM):
 Kamu HANYA diperbolehkan menyandarkan analisismu dan keputusan sinyal (BUY/SELL/NEUTRAL) pada indikator-indikator teknikal yang aktif dan dipilih oleh pengguna berikut: [ ${(indicators || []).join(', ')} ]. Jangan pernah berspekulasi, menyimpulkan, atau menyisipkan indikator teknikal lain yang tidak dipilih atau tidak dicentang di atas! Jika indikator terpilih adalah "RSI" dan "EMA-50", batasi visualisasi dan analisis logika algoritma kognitifmu hanya pada kedua indikator tersebut.
 
-⚠️ PENTING: ATURAN PENGAMBILAN KEPUTUSAN BUY / SELL / NEUTRAL (ANTI-BIAS BELI):
-Jangan bias ke BUY saja! Mayoritas analis kognitif seringkali terjebak menyajikan rekomendasi BUY demi rasa aman semu. Kamu wajib mandiri, berani, objektif, dan seimbang berdasarkan indikator riil terpilih.
-Tentukan jenis aksi trading ('type') secara rasional:
-1. Jika indikator terpilih [ ${(indicators || []).join(', ')} ] memberikan sinyal bearish (misalnya RSI tinggi/overbought >= 60, harga mendekati Pivot Resistance R1/R2, harga di atas garis Upper Bollinger Band, EMA-50 melintas di bawah EMA-200, atau MACD Histogram negatif), kamu WAJIB merekomendasikan aksi 'SELL'. Jangan ragu menyampaikan sinyal short/sell.
-2. Jika indikator terpilih [ ${(indicators || []).join(', ')} ] memberikan sinyal bullish (misalnya RSI rendah/oversold <= 40, harga mendekati Pivot Support S1/S2, harga di bawah Lower Bollinger Band, EMA-50 melintas di atas EMA-200, atau MACD Histogram positif), kamu baru merekomendasikan aksi 'BUY'.
-3. Jika indikator tidak meyakinkan, saling bertolak belakang (misal RSI netral 45-55, MACD lemah, Bollinger menyempit ketat/flat, atau tidak ada arah tren yang kuat), tentukan aksi 'NEUTRAL'. Jangan paksakan membuat sinyal entry aktif! Berikan rasio analisis realistis demi keselamatan dana trading pengguna.
+⚠️ PENTING: ATURAN PENGAMBILAN KEPUTUSAN BUY / SELL / NEUTRAL (SEIMBANG & OBJEKTIF):
+🚨 CRITICAL RULE: Jangan bias ke BUY! Distribusi sinyal harus SEIMBANG: ~33% BUY, ~33% SELL, ~34% NEUTRAL.
+Kamu wajib OBJEKTIF dan BERANI menyampaikan SELL signals ketika kondisi market bearish, tidak peduli sentiment positif.
+
+Tentukan jenis aksi trading ('type') dengan urutan prioritas KETAT:
+
+TIER 1 - SINYAL KUAT (Confidence: HIGH):
+• SELL KUAT: RSI > 65 (overbought) DAN (harga > Resistance R1 ATAU EMA-50 < EMA-200 ATAU MACD histogram negatif). Jangan ragu! Pasar sudah overbought, perlu revert.
+• BUY KUAT: RSI < 35 (oversold) DAN (harga < Support S1 ATAU EMA-50 > EMA-200 ATAU MACD histogram positif). Kondisi oversold dengan buy signal kuat.
+• NEUTRAL KUAT: Indikator SALING BERTENTANGAN atau tidak ada sinyal jelas (misal: RSI overbought tapi EMA-50 still above EMA-200).
+
+TIER 2 - SINYAL SEDANG (Confidence: MEDIUM):
+• SELL MEDIUM: RSI 55-65 (mendekati overbought) ATAU harga mulai rejection di Resistance R1 ATAU EMA-50 start crossing bawah EMA-200. Market mulai lemah.
+• BUY MEDIUM: RSI 35-45 (mendekati oversold) ATAU harga mulai bounce dari Support S1 ATAU EMA-50 start crossing naik EMA-200. Market mulai strong.
+• NEUTRAL MEDIUM: Mix signals - misal RSI normal (45-55) tapi price di resistance area, atau MACD weak, atau Bollinger squeeze.
+
+TIER 3 - SINYAL LEMAH (Confidence: LOW):
+• Jika hanya 1 indikator bearish/bullish tapi yang lain netral → output NEUTRAL dengan confidence LOW (jangan paksa BUY/SELL).
+• Jika kondisi truly uncertain (flat market, no clear direction) → NEUTRAL adalah pilihan TERBAIK.
+
+🎯 DISTRIBUSI MINIMAL: Setiap 10 analisis, output minimal 3 SELL, 3 BUY, 4 NEUTRAL. Jangan lanjutkan BUY kalau sudah banyak!
 
 ⌛ PENENTUAN TIMEFRAME & GAYA TRADING (DESAIN TARGET RISIKO & RASIO TP/SL):
 Timeframe "${timeframe || 'M15'}" dan Gaya Trading "${tradingStyle || 'Bebas'}" adalah penentu utama pips atau jarak persentase antara harga entry, takeProfit1, takeProfit2, dan stopLoss! Hubungkan pips/persentase ini secara matematis yang sangat ketat:
@@ -579,12 +594,16 @@ ${historyContext}
 ${compiledMetrics ? `DATA AGREGATOR LIVE PASAR UNTUK REKTIFIKASI (WAJIB DIBACA DAN DIALIRKAN DALAM ANALISISMU):
 ${compiledMetricsContext}` : ''}
 
-REKAYASA SINYAL SESUAI GAYA TRADING:
-- Tentukan jenis aksi trading ('type'): 'BUY', 'SELL', atau 'NEUTRAL'.
-- Tentukan gaya trading ('style') di mana kamu WAJIB memprioritaskan gaya trading berikut: "${tradingStyle || 'bebas'}". Gaya trading ini harus diisi dengan salah satu dari pilihan format: 'SCALP', 'DAY TRADE', 'SWING', atau 'POSITION'.
-- Tentukan harga 'entryPrice' yang sangat rasional (berdekatan dengan harga sekarang yaitu ${currentPrice}).
-- Berikan target 'takeProfit1' dan 'takeProfit2' serta batas pengaman 'stopLoss' yang logis sesuai kaidah risk/reward ratio sehat (minimum 1:1.5 ketat). SANGAT WAJIB SESUAIKAN Jarak TP/SL dengan kerangka waktu analisis (timeframe) "${timeframe || 'M15'}" yang telah dicantumkan di atas!
-- Atur tingkat kepercayaan 'confidence': dapat berkisar antara 'HIGH', 'MEDIUM', atau 'LOW'.
+REKAYASA SINYAL SESUAI GAYA TRADING & KONDISI MARKET:
+- Tentukan jenis aksi trading ('type'): 'BUY', 'SELL', atau 'NEUTRAL' berdasarkan indikator, BUKAN timeframe.
+- Tentukan gaya trading ('style'): "${tradingStyle || 'DAY TRADE'}". Jika user tidak specify, default 'DAY TRADE'.
+- Tentukan harga 'entryPrice': CURRENT PRICE (${currentPrice}) atau level psikologis terdekat. Jangan spekulasi harga masa depan!
+- 'takeProfit1' & 'takeProfit2': Hitung berdasarkan volatility & indikator, bukan timeframe.
+  * Untuk BUY: TP = current price × (1 + profit %) dimana profit % = 0.5% to 2% tergantung volatility
+  * Untuk SELL: TP = current price × (1 - profit %)
+  * Risk/Reward minimum 1:1.5 (SL distance ÷ TP distance ≥ 1.5)
+- 'stopLoss': Logical level dari indikator (resistance untuk SELL, support untuk BUY), bukan arbitrary %.
+- Atur tingkat kepercayaan 'confidence': HIGH (2+ indikator confirm), MEDIUM (1-2 mixed), LOW (unclear/conflicting).
 
 STRUKTUR ANALISIS (Tulis semua penjelasan dalam Bahasa Indonesia yang profesional, tegas, dan berbobot tanpa istilah main-main):
 - 'sentiment': Jelaskan dinamika pelaku pasar dengan detail, psikologi pembeli/penjual di area harga sekarang berdasarkan indikator terpilih [ ${(indicators || []).join(', ')} ] dan data sentimen pasar di atas.
