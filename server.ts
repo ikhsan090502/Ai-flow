@@ -2,7 +2,6 @@ import express from 'express';
 import path from 'path';
 import { fileURLToPath } from 'url';
 import { createServer as createViteServer } from 'vite';
-import Anthropic from '@anthropic-ai/sdk';
 import dotenv from 'dotenv';
 import { SUPPORTED_ASSETS } from './src/assetsList';
 
@@ -273,52 +272,56 @@ app.get('/api/market/prices', async (req, res) => {
   res.json(cachedPrices);
 });
 
-// Initialize Claude Client
-const claudeApiKey = process.env.ANTHROPIC_API_KEY || '';
-let ai: Anthropic | null = null;
+// OpenRouter API Configuration
+const openRouterApiKey = process.env.OPENROUTER_API_KEY || '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';
 
-if (claudeApiKey) {
-  ai = new Anthropic({
-    apiKey: claudeApiKey,
-  });
-}
-
-// Helper function to handle transparent Claude API retries with exponential backoff
-async function generateContentWithRetry(generateFn: (modelName: string) => Promise<any>, maxRetries = 3, initialDelay = 1200) {
+// Helper function to handle OpenRouter API retries with exponential backoff
+async function callOpenRouterAPI(systemPrompt: string, modelName = 'meta-llama/llama-3.3-70b-instruct', maxRetries = 3, initialDelay = 800) {
   let attempt = 0;
-  let currentModel = 'claude-opus-4-8';
 
   while (true) {
     try {
-      return await generateFn(currentModel);
-    } catch (error: any) {
-      attempt++;
+      const response = await fetch('https://openrouter.ai/api/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'Authorization': `Bearer ${openRouterApiKey}`,
+          'HTTP-Referer': 'https://ai-flow.app',
+          'X-Title': 'AI Flow - Real-time Trading Analysis'
+        },
+        body: JSON.stringify({
+          model: modelName,
+          messages: [
+            {
+              role: 'system',
+              content: 'Kamu adalah sistem analisis pasar keuangan ahli. Keluaran respons kamu harus selalu berupa JSON valid dan murni.'
+            },
+            {
+              role: 'user',
+              content: systemPrompt
+            }
+          ],
+          response_format: { type: 'json_object' }
+        })
+      });
 
-      const errStr = String(error?.message || error).toLowerCase();
-      const isTemporary =
-        error?.status === 503 ||
-        error?.code === 503 ||
-        error?.status === 'UNAVAILABLE' ||
-        error?.status === 429 ||
-        errStr.includes('503') ||
-        errStr.includes('overloaded') ||
-        errStr.includes('unavailable') ||
-        errStr.includes('rate limit') ||
-        errStr.includes('429');
-
-      if (isTemporary && attempt < maxRetries) {
-        const delay = initialDelay * Math.pow(2, attempt - 1);
-        console.warn(`[Claude API Warning] Terjadi error temporer pada model '${currentModel}'. Melakukan percobaan ulang ${attempt}/${maxRetries} dalam ${delay}ms...`);
-        await new Promise(resolve => setTimeout(resolve, delay));
-        continue;
+      if (!response.ok) {
+        const errorData = await response.json();
+        throw new Error(errorData.error?.message || `API Error: ${response.statusText}`);
       }
 
-      if (isTemporary) {
-        const customError = new Error(
-          'Claude API saat ini mengalami beban tinggi. Silakan tunggu beberapa detik lalu coba lagi. (Detail: ' + (error.message || 'Service Unavailable') + ')'
-        );
-        (customError as any).status = 503;
-        throw customError;
+      const data = await response.json();
+      return data.choices?.[0]?.message?.content || '{}';
+    } catch (error: any) {
+      attempt++;
+      const errStr = String(error?.message || error).toLowerCase();
+      const isRetryable = errStr.includes('429') || errStr.includes('timeout') || errStr.includes('unavailable');
+
+      if (isRetryable && attempt < maxRetries) {
+        const delay = initialDelay * Math.pow(2, attempt - 1);
+        console.warn(`[OpenRouter] Retry ${attempt}/${maxRetries} dalam ${delay}ms...`);
+        await new Promise(resolve => setTimeout(resolve, delay));
+        continue;
       }
 
       throw error;
@@ -549,7 +552,7 @@ ${Array.isArray(fundamentals) ? fundamentals.map((f: any) => `- ${f.label}: ${f.
   }
 
   // Build high impact prompt that forces objective and timeframe-calibrated analysis
-  const systemPrompt = `Kamu adalah FuturesMax AI, sebuah sistem AI analis profesional elit di pasar Crypto, Forex, Komoditas, dan Saham Indonesia (IDX) yang dilengkapi dengan "Continuous Learning Cognitive Circuitry" (Sistem Memori Pembelajaran Berkelanjutan).
+  const systemPrompt = `Kamu adalah AI Flow AI, sebuah sistem AI analis profesional elit di pasar Crypto, Forex, Komoditas, dan Saham Indonesia (IDX) yang dilengkapi dengan "Continuous Learning Cognitive Circuitry" (Sistem Memori Pembelajaran Berkelanjutan).
 Tugasmu adalah menganalisis pergerakan teknikal secara mendalam berdasarkan parameter input dan data live pasar teragregasi yang kami sediakan, dan memberikan rekomendasi serta sinyal perdagangan (Signal Entry) yang akurat dan kredibel.
 
 🎯 ATURAN MUTLAK INDIKATOR TERPILIH (PENTINGNYA INTEGRASI INDIKATOR SISTEM):
@@ -603,66 +606,10 @@ ${customPrompt ? `Konteks atau catatan tambahan pengguna: ${customPrompt}` : ''}
 Format balasan WAJIB berupa objek JSON valid sesuai spesifikasi schema.`;
 
   try {
-    let rawTextOutput = '{}';
+    // Use OpenRouter with powerful free model for real-time analysis
+    const activeModel = openRouterModel || 'meta-llama/llama-3.3-70b-instruct';
 
-    // Check if writing through OpenRouter vs Claude
-    const defaultOpenRouterKey = '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';
-    if (aiEngine === 'openrouter' && (openRouterApiKey || process.env.OPENROUTER_API_KEY || defaultOpenRouterKey)) {
-      const activeApiKey = openRouterApiKey || process.env.OPENROUTER_API_KEY || defaultOpenRouterKey;
-      const activeModel = openRouterModel || 'meta-llama/llama-3.3-70b-instruct';
-
-      const openRouterRes = await fetch('https://openrouter.ai/api/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'Authorization': `Bearer ${activeApiKey}`,
-          'HTTP-Referer': 'https://futuresmax.ai',
-          'X-Title': 'FuturesMax AI Flow'
-        },
-        body: JSON.stringify({
-          model: activeModel,
-          messages: [
-            {
-              role: 'system',
-              content: 'Kamu adalah sistem analisis pasar keuangan ahli. Keluaran respons kamu harus selalu berupa JSON valid dan murni.'
-            },
-            {
-              role: 'user',
-              content: systemPrompt
-            }
-          ],
-          response_format: { type: 'json_object' }
-        })
-      });
-
-      if (!openRouterRes.ok) {
-        const errorText = await openRouterRes.text();
-        throw new Error(`OpenRouter gagal merespons: ${errorText || openRouterRes.statusText}`);
-      }
-
-      const resData = await openRouterRes.json();
-      rawTextOutput = resData.choices?.[0]?.message?.content || '{}';
-    } else {
-      // Claude Anthropic API Engine
-      if (!ai) {
-        throw new Error('ANTHROPIC_API_KEY tidak terkonfigurasi pada server. Silakan pasang kunci API atau gunakan OpenRouter.');
-      }
-
-      const response = await generateContentWithRetry((modelName) =>
-        ai!.messages.create({
-          model: modelName,
-          max_tokens: 2048,
-          messages: [
-            {
-              role: 'user',
-              content: systemPrompt
-            }
-          ]
-        })
-      );
-
-      rawTextOutput = response.content?.[0]?.type === 'text' ? response.content[0].text : '{}';
-    }
+    const rawTextOutput = await callOpenRouterAPI(systemPrompt, activeModel);
 
     // Clean potential markdown blocks just in case
     const cleanedTextOutput = rawTextOutput.replace(/```json\s*/ig, '').replace(/```\s*$/ig, '').trim();
@@ -783,7 +730,7 @@ app.post('/api/telegram/send', async (req, res) => {
 Bearish Skenario:</b>
 <i>${signal.bearishCase}</i>
 
-📱 <i>Generated by Claude AI (FuturesMax VIP Room)</i>
+📱 <i>Generated by Claude AI (AI Flow VIP Room)</i>
   `.trim();
 
   try {
@@ -818,7 +765,7 @@ app.post('/api/telegram/test', async (req, res) => {
     return res.status(400).json({ error: 'Bot Token and Chat ID are required' });
   }
 
-  const messageText = `⚡ <b>FUTURESMAX AI FLOW</b>\n\nSelamat! Integrasi bot Telegram Anda dengan FuturesMax AI Flow berhasil disinkronisasi.\nSetiap analisa sinyal real-time baru akan langsung disalurkan ke chat/channel ini.`;
+  const messageText = `⚡ <b>FUTURESMAX AI FLOW</b>\n\nSelamat! Integrasi bot Telegram Anda dengan AI Flow AI Flow berhasil disinkronisasi.\nSetiap analisa sinyal real-time baru akan langsung disalurkan ke chat/channel ini.`;
 
   try {
     const telegramUrl = `https://api.telegram.org/bot${botToken}/sendMessage`;
@@ -876,7 +823,7 @@ app.post('/api/telegram/send-alert', async (req, res) => {
   }
 });
 
-// POST Review dynamic Trade Journal entry with Claude API
+// POST Review dynamic Trade Journal entry with OpenRouter API
 app.post('/api/gemini/review-journal', async (req, res) => {
   const { pair, type, entryPrice, exitPrice, status, entryReason, exitReason, pnl, notes } = req.body;
 
@@ -884,19 +831,8 @@ app.post('/api/gemini/review-journal', async (req, res) => {
     return res.status(400).json({ error: 'Pasangan, Tipe, Harga Entry, dan Alasan Masuk wajib diisi.' });
   }
 
-  const activeKey = process.env.ANTHROPIC_API_KEY;
-  if (!activeKey) {
-    return res.status(500).json({
-      error: 'ANTHROPIC_API_KEY belum terkonfigurasi. Silakan tambahkan ANTHROPIC_API_KEY di Settings > Secrets.'
-    });
-  }
-
   try {
-    const activeAi = new Anthropic({
-      apiKey: activeKey,
-    });
-
-    const systemPrompt = `Kamu adalah FuturesMax AI, mentor trading profesional elit dan psikolog pasar keuangan.
+    const systemPrompt = `Kamu adalah AI Flow, mentor trading profesional elit dan psikolog pasar keuangan.
 Tugasmu adalah menganalisis "Trade Journal" (Jurnal Perdagangan) yang diinput oleh pengguna dan memberikan ulasan analitis serta evaluasi "Post-Trade Review" (Analisis Pasca-Perdagangan) yang mendalam, kritis, objektif, serta taktis dalam bahasa Indonesia yang berbobot dan profesional tanpa bertele-tele.
 
 Detail Jurnal Perdagangan:
@@ -920,23 +856,10 @@ Tulis seluruh evaluasi ulasanmu dalam format Markdown yang elegan dengan bagian-
 ### ⚡ Rekomendasi Taktis & Core Feedback
 (Berikan 2 hingga 3 buah saran perbaikan taktis masa depan yang bersifat operasional dan praktis berdasarkan jurnal ini.)`;
 
-    const response = await generateContentWithRetry((modelName) =>
-      activeAi.messages.create({
-        model: modelName,
-        max_tokens: 2048,
-        messages: [
-          {
-            role: 'user',
-            content: systemPrompt
-          }
-        ]
-      })
-    );
-
-    const reviewText = response.content?.[0]?.type === 'text' ? response.content[0].text : 'Gagal menghasilkan ulasan dari AI.';
+    const reviewText = await callOpenRouterAPI(systemPrompt, 'meta-llama/llama-3.3-70b-instruct');
     return res.json({ success: true, aiReview: reviewText });
   } catch (error: any) {
-    console.error('Claude Trade Journal Review error:', error);
+    console.error('OpenRouter Trade Journal Review error:', error);
     return res.status(500).json({ error: error.message || 'Gagal menghasilkan tinjauan post-trade dari AI.' });
   }
 });
@@ -958,7 +881,7 @@ async function startServer() {
   }
 
   app.listen(PORT, '0.0.0.0', () => {
-    console.log(`FuturesMax AI Flow backend initialized on port ${PORT}`);
+    console.log(`AI Flow AI Flow backend initialized on port ${PORT}`);
   });
 }
 

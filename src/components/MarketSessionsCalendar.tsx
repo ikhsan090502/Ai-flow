@@ -484,7 +484,7 @@ export default function MarketSessionsCalendar({ onInjectContext }: MarketSessio
         {/* Learning Advice Footer */}
         <div className="text-[11px] font-mono text-slate-500 flex items-center space-x-2 bg-slate-950 p-3 rounded-lg border border-slate-850">
           <Info size={14} className="text-blue-400" />
-          <span><b>Kiat Pro FuturesMax</b>: Gunakan tombol <b className="text-slate-300">"Kirim Skenario Ke AI"</b> untuk mengoperasikan analisis kognitif Gemini sehingga model dapat mendeteksi support berisiko secara instan.</span>
+          <span><b>Kiat Pro AI Flow</b>: Gunakan tombol <b className="text-slate-300">"Kirim Skenario Ke AI"</b> untuk mengoperasikan analisis kognitif Gemini sehingga model dapat mendeteksi support berisiko secara instan.</span>
         </div>
       </div>
     </div>

@@ -1,5 +1,5 @@
 /**
- * FuturesMax marketDataCompiler.ts
+ * AI Flow marketDataCompiler.ts
  * Generates highly realistic, mathematically cohesive, and real-time responsive
  * Technical Indicators, Market Sentiments, and Fundamental factors based on active pair prices. This is used both
  * for premium frontend visualizations (meters, gauges) and to enrich the AI analysis payload for Gemini.

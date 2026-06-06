@@ -26,15 +26,9 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
   const [customPrompt, setCustomPrompt] = useState('');
   const [indicators, setIndicators] = useState<string[]>(['EMA-50', 'Orderblock / SMC', 'RSI']);
   
-  // Custom AI Engine settings
-  const [aiEngine, setAiEngine] = useState<'claude' | 'openrouter'>(() => {
-    return (localStorage.getItem('fm_ai_engine') as any) || 'claude';
-  });
-  const [openRouterApiKey, setOpenRouterApiKey] = useState(() => {
-    return localStorage.getItem('fm_openrouter_api_key') || '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';
-  });
+  // AI Engine settings - OpenRouter Free Models
   const [openRouterModel, setOpenRouterModel] = useState(() => {
-    return localStorage.getItem('fm_openrouter_model') || 'meta-llama/llama-3.3-70b-instruct';
+    return localStorage.getItem('ai_flow_model') || 'meta-llama/llama-3.3-70b-instruct';
   });
   const [showAiSettings, setShowAiSettings] = useState(false);
 
@@ -165,9 +159,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
           customPrompt,
           pastAnalyses: pastAnalysesPayload,
           compiledMetrics: compiledMetricsVal,
-          aiEngine,
-          openRouterModel,
-          openRouterApiKey: aiEngine === 'openrouter' ? openRouterApiKey : undefined
+          openRouterModel
         }),
       });
 
@@ -240,9 +232,9 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
           <div className="flex items-center space-x-2.5">
             <Cpu className="text-emerald-400" size={20} />
             <div>
-              <h2 className="text-sm font-mono font-bold text-white tracking-wider uppercase">FUTURESMAX COGNITIVE ENGINE</h2>
+              <h2 className="text-sm font-mono font-bold text-white tracking-wider uppercase">AI FLOW COGNITIVE ENGINE</h2>
               <p className="text-[10px] text-slate-500 font-mono uppercase">
-                {aiEngine === 'claude' ? 'CLAUDE API (Anthropic)' : `OPENROUTER: ${openRouterModel.split('/').pop()}`}
+                🚀 {openRouterModel.split('/').pop()}
               </p>
             </div>
           </div>
@@ -269,106 +261,25 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               <span className="text-xs font-mono font-bold uppercase tracking-wider">AI Cognitive Routing & Models</span>
             </div>
             
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              <div>
-                <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5">PILIH PROVIDER UTAMA</label>
-                <div className="grid grid-cols-2 gap-2">
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiEngine('claude');
-                      localStorage.setItem('fm_ai_engine', 'claude');
-                    }}
-                    className={`px-3 py-2 rounded-lg text-xs font-mono font-bold text-center border transition ${
-                      aiEngine === 'claude'
-                        ? 'bg-emerald-950/70 text-emerald-400 border-emerald-800'
-                        : 'bg-slate-900/60 text-slate-500 border-slate-850 hover:bg-slate-900 hover:text-slate-300'
-                    }`}
-                  >
-                    🚀 Claude API
-                  </button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setAiEngine('openrouter');
-                      localStorage.setItem('fm_ai_engine', 'openrouter');
-                    }}
-                    className={`px-3 py-2 rounded-lg text-xs font-mono font-bold text-center border transition ${
-                      aiEngine === 'openrouter'
-                        ? 'bg-cyan-950/70 text-cyan-400 border-cyan-800'
-                        : 'bg-slate-900/60 text-slate-500 border-slate-850 hover:bg-slate-900 hover:text-slate-300'
-                    }`}
-                  >
-                    🌐 OpenRouter AI
-                  </button>
-                </div>
-              </div>
-
-              <div>
-                {aiEngine === 'claude' ? (
-                  <div>
-                    <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5">MODEL CLAUDE UTAMA</label>
-                    <select
-                      disabled
-                      className="w-full bg-slate-900 border border-slate-850 rounded-lg px-3 py-2 text-xs text-slate-500 cursor-not-allowed font-mono outline-none"
-                    >
-                      <option>claude-opus-4-8 (Latest)</option>
-                    </select>
-                    <p className="text-[10px] text-slate-500 mt-1.5 font-mono">
-                      * Menggunakan Claude API dengan intelligent processing untuk analisis chart real-time yang akurat.
-                    </p>
-                  </div>
-                ) : (
-                  <div>
-                    <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5">PILIH MODEL OPENROUTER</label>
-                    <select
-                      value={openRouterModel}
-                      onChange={(e) => {
-                        setOpenRouterModel(e.target.value);
-                        localStorage.setItem('fm_openrouter_model', e.target.value);
-                      }}
-                      className="w-full bg-slate-900 border border-slate-855 rounded-lg px-3 py-2 text-xs text-white focus:outline-none focus:border-cyan-600 transition font-mono"
-                    >
-                      <option value="meta-llama/llama-3-8b-instruct:free">Llama 3 8B Instruct (GRATIS/FREE)</option>
-                      <option value="meta-llama/llama-3.1-8b-instruct:free">Llama 3.1 8B Instruct (GRATIS/FREE)</option>
-                      <option value="google/gemma-2-9b-it:free">Gemma 2 9B IT (GRATIS/FREE)</option>
+            <div>
+              <label className="block text-[11px] font-mono text-slate-400 uppercase mb-1.5">🚀 PILIH MODEL AI TERBAIK (FREE)</label>
+              <select
+                value={openRouterModel}
+                onChange={(e) => {
+                  setOpenRouterModel(e.target.value);
+                  localStorage.setItem('ai_flow_model', e.target.value);
+                }}
+                className="w-full bg-slate-900 border border-slate-800 rounded-lg px-3 py-2.5 text-xs text-white focus:outline-none focus:border-cyan-500 transition font-mono font-bold"
+              >
+                <option value="meta-llama/llama-3.3-70b-instruct">⚡ Llama 3.3 70B (POWERFUL)</option>
+                <option value="meta-llama/llama-3.1-405b-instruct">💎 Llama 3.1 405B (SUPER POWER)</option>
+                <option value="google/gemma-2-27b-it">🎯 Gemma 2 27B IT (FAST)</option>
                       <option value="qwen/qwen-2.5-7b-instruct:free">Qwen 2.5 7B Instruct (GRATIS/FREE)</option>
-                      <option value="anthropic/claude-3.5-sonnet">Claude 3.5 Sonnet (Standard)</option>
-                      <option value="anthropic/claude-3.5-sonnet:beta">Claude 3.5 Sonnet (Alternative Beta)</option>
-                      <option value="openai/gpt-4o">GPT-4o ChatGPT (Sangat Populer & Cerdas)</option>
-                      <option value="openai/gpt-4o-mini">GPT-4o Mini ChatGPT (Cepat & Efisien)</option>
-                      <option value="deepseek/deepseek-chat">DeepSeek V3 Chat (Analitis & Cepat)</option>
-                      <option value="meta-llama/llama-3.3-70b-instruct">Llama 3.3 70B Instruct (Sangat Cerdas)</option>
-                      <option value="qwen/qwen-2.5-72b-instruct">Qwen 2.5 72B Instruct (Trading Strategist)</option>
-                      <option value="nvidia/llama-3.1-nemotron-70b-instruct">Llama 3.1 Nemotron 70B (Presisi Sinyal)</option>
-                      <option value="google/gemini-2.5-flash">Gemini 2.5 Flash via OpenRouter</option>
-                    </select>
-                  </div>
-                )}
-              </div>
+              </select>
+              <p className="text-[9px] text-slate-400 mt-1.5 font-mono">
+                ✅ Semua model gratis | Real-time live chart analysis
+              </p>
             </div>
-
-            {aiEngine === 'openrouter' && (
-              <div className="pt-2">
-                <div className="flex items-center space-x-1.5 mb-1.5">
-                  <Key size={12} className="text-cyan-400" />
-                  <label className="block text-[11px] font-mono text-slate-400 uppercase">KUNCI API OPENROUTER (OPENROUTER API KEY)</label>
-                </div>
-                <input
-                  type="password"
-                  placeholder="Paste sk_or_... di sini (Disimpan aman di local browser saja)"
-                  value={openRouterApiKey}
-                  onChange={(e) => {
-                    setOpenRouterApiKey(e.target.value);
-                    localStorage.setItem('fm_openrouter_api_key', e.target.value);
-                  }}
-                  className="w-full bg-slate-900 border border-slate-850 rounded-lg px-3 py-2 text-xs text-white placeholder-slate-600 focus:outline-none focus:border-cyan-600 transition font-mono"
-                />
-                <p className="text-[10px] text-slate-500 mt-1.5 leading-relaxed font-mono">
-                  Dapatkan kunci API Anda di <a href="https://openrouter.ai/keys" target="_blank" rel="noreferrer" className="text-cyan-400 underline hover:text-cyan-300">openrouter.ai/keys</a>. Data API key dijamin 100% aman karena hanya digunakan sebagai header proxy request server-side dan tidak terekam dalam database server.
-                </p>
-              </div>
-            )}
           </div>
         )}
 
@@ -758,7 +669,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
           <div className="pl-4 space-y-1">
             <p>✔ Membaca feed harga live {pair} di bursa...</p>
             <p>✔ Menyerap indikator terbaca: {indicators.join(', ')}...</p>
-            <p>✔ Memproses sirkuit model {aiEngine === 'claude' ? 'claude-opus-4-8' : openRouterModel.split('/').pop()}...</p>
+            <p>✔ Memproses sirkuit model {openRouterModel.split('/').pop()}...</p>
             <p className="text-slate-600">⌛ Mengenal pola Quasimodo dan supply & demand harian...</p>
           </div>
         </div>
@@ -792,7 +703,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
                   </span>
                 </div>
                 <p className="text-[10px] text-slate-500 font-mono mt-1 uppercase">
-                  Hasil Kognisi {aiEngine === 'claude' ? 'Claude API' : openRouterModel.split('/').pop()}
+                  Hasil Kognisi {openRouterModel === 'claude' ? 'Claude API' : openRouterModel.split('/').pop()}
                 </p>
               </div>
 
@@ -957,7 +868,7 @@ export default function TechnicalAnalyzer({ selectedAsset, selectedPrice, telegr
               <div className="space-y-0.5">
                 <span className="text-slate-500 block uppercase text-[10px]">Model Utama</span>
                 <span className="text-slate-200 font-bold block truncate max-w-[120px]">
-                  {aiEngine === 'claude' ? 'Claude Opus' : openRouterModel.split('/').pop()}
+                  {openRouterModel === 'claude' ? 'Claude Opus' : openRouterModel.split('/').pop()}
                 </span>
               </div>
               <div className="space-y-0.5">

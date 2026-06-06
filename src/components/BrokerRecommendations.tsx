@@ -75,7 +75,7 @@ export default function BrokerRecommendations() {
       ],
       signupBonus: 'Bonus Perdana hingga 1,000 USDT + Reward Airdrop Harian',
       referralLink: 'https://www.mexc.com',
-      description: 'MEXC Global adalah legenda para pemburu token multi-bagger dengan pilihan aset crypto terlengkap dari seluruh dunia, menjadikannya pelengkap wajib deck analisis FuturesMax.'
+      description: 'MEXC Global adalah legenda para pemburu token multi-bagger dengan pilihan aset crypto terlengkap dari seluruh dunia, menjadikannya pelengkap wajib deck analisis AI Flow.'
     },
     {
       id: 'bybit',
@@ -146,7 +146,7 @@ export default function BrokerRecommendations() {
             BURSA & BROKER CRYPTO FUTURES PREMIUM
           </h2>
           <p className="text-xs sm:text-sm text-slate-400 mt-2 leading-relaxed">
-            Mengejar cuan ribuan persen membutuhkan perpaduan cerdas antara kognisi sinyal <b className="text-emerald-400">FuturesMax AI</b> dan pemilihan bursa yang memiliki fee ramah, leverage presisi, serta kemampuan melisensi token micro / meme langka seperti <b className="text-amber-400">GNUUSDT</b> secara instan.
+            Mengejar cuan ribuan persen membutuhkan perpaduan cerdas antara kognisi sinyal <b className="text-emerald-400">AI Flow AI</b> dan pemilihan bursa yang memiliki fee ramah, leverage presisi, serta kemampuan melisensi token micro / meme langka seperti <b className="text-amber-400">GNUUSDT</b> secara instan.
           </p>
         </div>
       </div>
