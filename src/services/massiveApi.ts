@@ -108,4 +108,5 @@ class MassiveApiService {
   }
 }
 
-export { MassiveApiService, MassivePrice };
+export { MassiveApiService };
+export type { MassivePrice };
