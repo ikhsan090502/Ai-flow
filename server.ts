@@ -78,17 +78,16 @@ dotenv.config();
 const app = express();
 const PORT = 3000;
 
-// Initialize Massive API
-const massiveApiKey = process.env.MASSIVE_API_KEY;
-let massiveAPI: MassiveAPI | null = null;
+// Initialize Massive WebSocket (Real-time streaming)
+const massiveAccessKey = process.env.MASSIVE_ACCESS_KEY_ID;
+const massiveSecretKey = process.env.MASSIVE_SECRET_KEY;
 
-if (massiveApiKey) {
-  massiveAPI = new MassiveAPI(massiveApiKey);
-  console.log('⚠️ Massive API key configured but disabled (endpoint issue)');
-  console.log('📌 Using Binance + Yahoo Finance as primary sources');
-  massiveAPI = null; // Temporarily disable until endpoint is fixed
+if (massiveAccessKey && massiveSecretKey) {
+  console.log('🔗 Massive WebSocket credentials configured');
+  console.log('⏳ Will initialize WebSocket after server starts...');
 } else {
-  console.warn('⚠️ MASSIVE_API_KEY not configured, using fallback sources');
+  console.warn('⚠️ Massive WebSocket credentials not found');
+  console.log('📌 Using Binance + Yahoo Finance as fallback');
 }
 
 // Middleware
