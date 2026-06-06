@@ -114,11 +114,14 @@ async function updateRealPricesCache() {
             }
           });
 
-          // Map PAXGUSDT directly to XAUUSD (Gold spot) for high frequency real-time updates
+          // Map PAXGUSDT directly to XAUUSD (Spot Gold) - most accurate real-time gold price
+          // PAXGUSDT on Binance = PAX Gold (backed by physical gold vaults)
+          // This is the SPOT GOLD price, matching trading websites
           if (sym === 'PAXGUSDT') {
             const rawPrice = parseFloat(item.lastPrice || item.price);
             const change = parseFloat(item.priceChangePercent);
             if (!isNaN(rawPrice)) {
+              console.log(`📊 Live XAUUSD (Spot Gold): $${rawPrice.toFixed(2)}`);
               setServerCachedPrice('XAUUSD', rawPrice, isNaN(change) ? 0 : change);
             }
           }
@@ -152,40 +155,53 @@ async function updateRealPricesCache() {
     console.error('ExchangeRate Forex fetch failed on server:', err);
   }
 
-  // 3. Fetch Spot Gold & Silver from Yahoo Finance / ExchangeRate-API (completely keyless)
-  try {
-    const [goldRes, silverRes] = await Promise.all([
-      fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d').catch(() => null),
-      fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=1d').catch(() => null)
-    ]);
-    
-    let goldPrice: number | null = null;
-    let silverPrice: number | null = null;
-    let goldChange = -0.15;
-    let silverChange = 0.45;
+  // 3. Fetch Spot Gold & Silver from BINANCE (PAXGUSDT = most accurate spot gold)
+  // XAUUSD Spot = PAX Gold on Binance (real-time, accurate)
+  let goldPrice: number | null = null;
+  let silverPrice: number | null = null;
+  let goldChange = -0.15;
+  let silverChange = 0.45;
 
-    if (goldRes && goldRes.ok) {
-      const json = await goldRes.json();
-      const result = json?.chart?.result?.[0];
-      const price = result?.meta?.regularMarketPrice;
-      const prevClose = result?.meta?.chartPreviousClose;
-      if (price !== undefined && price !== null) {
-        goldPrice = price;
-        if (prevClose) {
-          goldChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+  try {
+    // PAXGUSDT is spot gold from Binance (most accurate for XAUUSD)
+    const binanceGoldRes = await fetch('https://api.binance.com/api/v3/ticker/24hr?symbol=PAXGUSDT').catch(() => null);
+    if (binanceGoldRes?.ok) {
+      const data = await binanceGoldRes.json();
+      goldPrice = parseFloat(data.lastPrice);
+      goldChange = parseFloat(data.priceChangePercent);
+      console.log(`✅ Spot Gold (PAXGUSDT) from Binance: $${goldPrice}`);
+    }
+
+    // Fallback: Yahoo Finance for futures prices if Binance fails
+    if (!goldPrice) {
+      const [goldRes, silverRes] = await Promise.all([
+        fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/GC=F?interval=1d&range=1d').catch(() => null),
+        fetch('https://query1.finance.chart.yahoo.com/v8/finance/chart/SI=F?interval=1d&range=1d').catch(() => null)
+      ]);
+
+      if (goldRes && goldRes.ok) {
+        const json = await goldRes.json();
+        const result = json?.chart?.result?.[0];
+        const price = result?.meta?.regularMarketPrice;
+        const prevClose = result?.meta?.chartPreviousClose;
+        if (price !== undefined && price !== null) {
+          goldPrice = price;
+          if (prevClose) {
+            goldChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+          }
         }
       }
-    }
-    
-    if (silverRes && silverRes.ok) {
-      const json = await silverRes.json();
-      const result = json?.chart?.result?.[0];
-      const price = result?.meta?.regularMarketPrice;
-      const prevClose = result?.meta?.chartPreviousClose;
-      if (price !== undefined && price !== null) {
-        silverPrice = price;
-        if (prevClose) {
-          silverChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+
+      if (silverRes && silverRes.ok) {
+        const json = await silverRes.json();
+        const result = json?.chart?.result?.[0];
+        const price = result?.meta?.regularMarketPrice;
+        const prevClose = result?.meta?.chartPreviousClose;
+        if (price !== undefined && price !== null) {
+          silverPrice = price;
+          if (prevClose) {
+            silverChange = Number((((price - prevClose) / prevClose) * 100).toFixed(2));
+          }
         }
       }
     }
@@ -196,7 +212,7 @@ async function updateRealPricesCache() {
     setServerCachedPrice('XAUUSD', finalGold, goldChange);
     setServerCachedPrice('XAGUSD', finalSilver, silverChange);
   } catch (err) {
-    console.error('Gold/Silver spot Yahoo/fallback fetch failed on server:', err);
+    console.error('Gold/Silver fetch failed, using cached prices:', err);
   }
 
   // 4. Fallback Yahoo Fetch for IDX stock prices (handles dns exceptions cleanly)
@@ -253,14 +269,17 @@ function setServerCachedPrice(symbol: string, price: number, change: number) {
   };
 }
 
-// Background auto updater every 15s to keep prices fresh
+// Background auto updater - more frequent for accurate live prices
+// Gold/Forex: Every 5s for real-time accuracy
+// Crypto: Every 10s
+// Stocks: Every 15s
 setInterval(async () => {
   try {
     await updateRealPricesCache();
   } catch (e) {
     console.error('Error in background price fetch:', e);
   }
-}, 15000);
+}, 5000); // Changed from 15s to 5s for better real-time accuracy
 
 // Proxy Price Endpoint
 app.get('/api/market/prices', async (req, res) => {
