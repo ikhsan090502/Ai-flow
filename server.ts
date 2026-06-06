@@ -273,7 +273,7 @@ app.get('/api/market/prices', async (req, res) => {
 });
 
 // OpenRouter API Configuration
-const openRouterApiKey = process.env.OPENROUTER_API_KEY || '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';
+const openRouterApiKey = process.env.OPENROUTER_API_KEY;
 
 // Helper function to handle OpenRouter API retries with exponential backoff
 async function callOpenRouterAPI(systemPrompt: string, modelName = 'meta-llama/llama-3.3-70b-instruct', maxRetries = 3, initialDelay = 800) {
@@ -510,6 +510,10 @@ app.post('/api/analyze', async (req, res) => {
 
   if (!pair || !currentPrice) {
     return res.status(400).json({ error: 'Pair and currentPrice are required' });
+  }
+
+  if (!openRouterApiKey) {
+    return res.status(500).json({ error: 'OPENROUTER_API_KEY is not configured. Please set it in environment variables.' });
   }
 
   // Format a compact summary of past analyses for AI context
