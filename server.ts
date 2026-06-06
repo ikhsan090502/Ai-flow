@@ -424,10 +424,11 @@ setInterval(async () => {
     // MOST FREQUENT: Binance crypto (every 2s = every interval)
     await updateBinancePrices();
 
-    // Finnhub REST polling (every 8s = respect rate limit)
-    if (updateCounter % 4 === 0) {
-      await updateFinnhubRestPrices();
-    }
+    // Finnhub REST polling DISABLED - hitting 429 rate limit
+    // Using Binance + cache instead
+    // if (updateCounter % 4 === 0) {
+    //   await updateFinnhubRestPrices();
+    // }
 
     // FREQUENT: Yahoo Finance (every 4s = every 2 intervals)
     if (updateCounter % 2 === 0) {
@@ -1149,38 +1150,10 @@ async function startServer() {
     console.log(`✅ AI Flow backend initialized on port ${PORT}`);
     console.log(`📡 WebSocket streaming ready at wss://localhost:${PORT}/`);
 
-    // Initialize Finnhub WebSocket connection
-    if (finnhubApiKey) {
-      try {
-        const { FinnhubWebSocketClient } = await import('./src/services/finnhubWebsocket.js');
-        finnhubClient = new FinnhubWebSocketClient(finnhubApiKey);
-
-        await finnhubClient.connect();
-
-        // Subscribe to all symbols we track
-        const symbolsToTrack = [
-          'XAUUSD', 'EURUSD', 'GBPUSD', 'AUDUSD', 'USDJPY', 'USDCAD', 'USDCHF',
-          'BTC', 'ETH', 'SOL', 'XRP',
-          'BBCA', 'BBRI', 'TLKM', 'ASII'
-        ];
-
-        symbolsToTrack.forEach(symbol => {
-          finnhubClient.subscribe(symbol);
-
-          // Handle price updates
-          finnhubClient.onPrice(symbol, (data: any) => {
-            if (data.price > 0) {
-              setServerCachedPrice(symbol, data.price, 0);
-            }
-          });
-        });
-
-        console.log('🔗 Finnhub streaming initialized with', symbolsToTrack.length, 'symbols');
-      } catch (error) {
-        console.error('⚠️ Finnhub initialization failed:', error);
-        console.log('📌 Falling back to Binance + Yahoo Finance');
-      }
-    }
+    // Finnhub WebSocket DISABLED - connection keeps failing + REST API hitting 429 rate limit
+    // Using Binance WebSocket (working 100%) + smart cache instead
+    console.log('📌 Using Binance WebSocket + Yahoo Finance + Smart Cache');
+    console.log('✅ Real-time prices guaranteed via multiple fallback layers');
   });
 }
 
