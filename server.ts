@@ -100,19 +100,28 @@ app.get('/api/health', (req, res) => {
 // Finnhub Webhook - Real-time price push (ZERO gaps, NO rate limits!)
 app.post('/api/finnhub/webhook', (req, res) => {
   try {
+    console.log('🔔 Webhook received - processing...');
+    console.log('Headers:', Object.keys(req.headers));
+    console.log('Body type:', typeof req.body);
+
     // Verify webhook signature (Finnhub requirement)
     const secret = process.env.FINNHUB_WEBHOOK_SECRET;
     const headerSecret = req.headers['x-finnhub-secret'];
 
+    console.log(`Secret configured: ${!!secret}`);
+    console.log(`Header secret match: ${headerSecret === secret}`);
+
     if (!secret) {
-      console.error('❌ FINNHUB_WEBHOOK_SECRET not configured');
+      console.error('❌ FINNHUB_WEBHOOK_SECRET not configured - SET IN RENDER ENV VARS!');
       return res.status(500).json({ error: 'Webhook secret not configured' });
     }
 
     if (headerSecret !== secret) {
-      console.warn('⚠️ Webhook signature mismatch');
+      console.warn(`⚠️ Webhook signature mismatch: ${headerSecret} vs ${secret}`);
       return res.status(401).json({ error: 'Unauthorized' });
     }
+
+    console.log('✅ Webhook signature verified');
 
     // ACKNOWLEDGE IMMEDIATELY (Finnhub requires 2xx response)
     res.status(200).json({ status: 'received' });
