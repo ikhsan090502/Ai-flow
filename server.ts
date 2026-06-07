@@ -101,8 +101,13 @@ app.get('/api/health', (req, res) => {
 app.post('/api/finnhub/webhook', (req, res) => {
   try {
     // Verify webhook signature (Finnhub requirement)
-    const secret = process.env.FINNHUB_WEBHOOK_SECRET || 'd8iaumhr01qm63bb2ql0';
+    const secret = process.env.FINNHUB_WEBHOOK_SECRET;
     const headerSecret = req.headers['x-finnhub-secret'];
+
+    if (!secret) {
+      console.error('❌ FINNHUB_WEBHOOK_SECRET not configured');
+      return res.status(500).json({ error: 'Webhook secret not configured' });
+    }
 
     if (headerSecret !== secret) {
       console.warn('⚠️ Webhook signature mismatch');
