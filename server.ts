@@ -97,6 +97,48 @@ app.get('/api/health', (req, res) => {
   res.status(200).json({ status: 'OK', timestamp: new Date().toISOString() });
 });
 
+// Finnhub Webhook - Real-time price push (ZERO gaps, NO rate limits!)
+app.post('/api/finnhub/webhook', (req, res) => {
+  try {
+    // Verify webhook signature (Finnhub requirement)
+    const secret = process.env.FINNHUB_WEBHOOK_SECRET || 'd8iaumhr01qm63bb2ql0';
+    const headerSecret = req.headers['x-finnhub-secret'];
+
+    if (headerSecret !== secret) {
+      console.warn('⚠️ Webhook signature mismatch');
+      return res.status(401).json({ error: 'Unauthorized' });
+    }
+
+    // ACKNOWLEDGE IMMEDIATELY (Finnhub requires 2xx response)
+    res.status(200).json({ status: 'received' });
+
+    // Process webhook data asynchronously (don't block response)
+    setImmediate(() => {
+      const data = req.body;
+
+      if (data.type === 'trade' && data.data) {
+        data.data.forEach((trade: any) => {
+          const symbol = trade.s;
+          const price = trade.p;
+          if (symbol && price) {
+            setServerCachedPrice(symbol, price, 0);
+            console.log(`✅ Finnhub WEBHOOK: ${symbol} = ${price}`);
+          }
+        });
+      } else if (data.type === 'quote' && data.data) {
+        const quote = data.data;
+        if (quote.s && quote.p) {
+          setServerCachedPrice(quote.s, quote.p, 0);
+          console.log(`✅ Finnhub WEBHOOK QUOTE: ${quote.s} = ${quote.p}`);
+        }
+      }
+    });
+  } catch (error) {
+    console.error('Webhook error:', error);
+    res.status(200).json({ status: 'error' }); // Still return 200 to not disable webhook
+  }
+});
+
 // --- SERVER-SIDE LIVE PRICES CACHE & FETCH PROXY ---
 const SERVER_SEEDS: Record<string, { price: number; change24h: number }> = {
   XAUUSD: { price: 4483.00, change24h: 1.17 },
